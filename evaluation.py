@@ -1,7 +1,5 @@
 import sys, os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-sys.path.append("/data/fsolleza/Sandbox/timeseries-data") # path to this repository
-#sys.path.append("/Users/fsolleza/Documents/Projects/timeseries-data")
 import py_ts_data
 
 import tensorflow as tf
@@ -17,7 +15,6 @@ from sklearn.neighbors import NearestNeighbors, KNeighborsClassifier
 from sklearn.cluster import KMeans
 from sklearn.metrics import adjusted_rand_score, mean_squared_error, mean_absolute_error
 import argparse
-from utils import *
 
 def evaluate_reconstruction(x, encoder, decoder):
     """
@@ -164,9 +161,3 @@ def evaluate_clustering_ri(x_train, x_test, encoder, baseline, n_clusters):
     approximate_clusters = kmeans.predict(code_test)
 
     return adjusted_rand_score(baseline_clusters, approximate_clusters)
-
-
-
-
-
-

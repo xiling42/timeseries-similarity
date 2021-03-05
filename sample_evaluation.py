@@ -1,7 +1,5 @@
 import sys, os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-sys.path.append("/data/fsolleza/Sandbox/timeseries-data") # path to this repository
-#sys.path.append("/Users/fsolleza/Documents/Projects/timeseries-data")
 import py_ts_data
 
 import tensorflow as tf
@@ -16,7 +14,6 @@ import math
 from sklearn.neighbors import NearestNeighbors, KNeighborsClassifier
 from sklearn.cluster import KMeans
 import argparse
-from utils import *
 import evaluation
 
 PARSER = argparse.ArgumentParser()
