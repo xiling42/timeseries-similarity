@@ -87,7 +87,7 @@ loss_history = []
 for epoch in range(EPOCHS):
     total_loss = 0
     for i, (input, _) in enumerate(train_dataset):
-        loss = train_step(input, ae, ld = 0)
+        loss = train_step(input, ae, ld = 0.5)
     total_loss += loss
     loss_history.append(total_loss)
     print("Epoch {}: {}".format(epoch, total_loss), end="\r")
