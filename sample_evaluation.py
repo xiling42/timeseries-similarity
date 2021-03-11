@@ -3,8 +3,8 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import py_ts_data
 
 import tensorflow as tf
-from tensorflow.signal import fft, ifft
-from tensorflow.math import conj
+# from tensorflow.signal import fft, ifft
+# from tensorflow.math import conj
 from tensorflow import norm
 
 import numpy as np
@@ -17,7 +17,7 @@ import argparse
 import evaluation
 
 PARSER = argparse.ArgumentParser()
-PARSER.add_argument('-d', '--dataset', default=None, required=True, help="dataset to run")
+PARSER.add_argument('-d', '--dataset', default="GunPoint", required=False, help="dataset to run")
 PARSER.add_argument('-m', '--models', default="sample_model", required=False, help="dataset to run")
 ARGS = PARSER.parse_args()
 
@@ -69,6 +69,7 @@ def clustering(x):
     return CLUSTERING.predict(x)
 
 if __name__ == "__main__":
+
     recon = evaluation.evaluate_reconstruction(X_TEST, encoder, decoder)
     dist = evaluation.evaluate_distance(X_TEST, encoder, distance_collection)
     common = evaluation.evaluate_common_nn(X_TRAIN, X_TEST, encoder, distance_timeseries, N_NEIGHBORS)
