@@ -16,6 +16,7 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import adjusted_rand_score, mean_squared_error, mean_absolute_error
 import argparse
 
+
 def evaluate_reconstruction(x, encoder, decoder):
     """
     Evaluates the reconstruction error of the given encoder and decoder

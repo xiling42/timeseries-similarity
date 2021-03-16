@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import datetime
 from auto_encoder import AutoEncoder, train_step
 
-X_train, y_train, X_test, y_test, info = py_ts_data.load_data("Libras", variables_as_channels=True)
+X_train, y_train, X_test, y_test, info = py_ts_data.load_data("GunPoint", variables_as_channels=True)
 print("Dataset shape: Train: {}, Test: {}".format(X_train.shape, X_test.shape))
 
 
@@ -61,7 +61,7 @@ def normalize(data):
 
 kwargs = {
     "input_shape": (X_train.shape[1], X_train.shape[2]),
-    "filters": [32, 64, 128],
+    "filters": [128, 64, 32],
     "kernel_sizes": [5, 5, 5],
     "code_size": 16,
 }
@@ -74,8 +74,8 @@ ae = AutoEncoder(**kwargs)
 
 # %%
 
-EPOCHS = 5
-BATCH = 10
+EPOCHS = 100
+BATCH = len(X_train)
 SHUFFLE_BUFFER = 100
 K = len(set(y_train))
 
@@ -87,10 +87,11 @@ loss_history = []
 for epoch in range(EPOCHS):
     total_loss = 0
     for i, (input, _) in enumerate(train_dataset):
-        loss = train_step(input, ae, ld = 0.5)
+        # lamda = 0 all similarity
+        loss = train_step(input, ae, ld = 1)
     total_loss += loss
     loss_history.append(total_loss)
-    print("Epoch {}: {}".format(epoch, total_loss), end="\r")
+    print("Epoch {}: {}".format(epoch, total_loss))
 
 plt.plot(loss_history)
 

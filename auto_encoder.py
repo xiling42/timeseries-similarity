@@ -241,11 +241,11 @@ class AutoEncoder:
         self.loss = loss
         self.optimizer = optimizer
 
-    def similarity_loss(self, inputs, codes):
+    def similarity_loss(self, codes, decodes):
         # batchs size * timestamp size * variable size  ?? flatten?
         # batch [10,x,x] -> [C10 2, x, x]
 
-        idx_combination = list(it.combinations([i for i in range(len(inputs))], 2))
+        idx_combination = list(it.combinations([i for i in range(len(codes))], 2))
         # print('l idx: ', len(idx_combination))
         idx_list_1, idx_list_2 = [list(c) for c in zip(*idx_combination)]
         codes_dist = tf.convert_to_tensor(0.0)
@@ -255,8 +255,12 @@ class AutoEncoder:
 
         for i in range(len(idx_combination)):
             idx1, idx2 = idx_combination[i]
-            inputs_sbd = _sbd_tf(tf.reshape(codes[idx1], [-1]), tf.reshape(codes[idx2], [-1]))
-            codes_sbd = _sbd_tf(tf.reshape(inputs[idx1], [-1]), tf.reshape(inputs[idx2], [-1]))
+            # inputs_sbd = _sbd_tf(tf.reshape(codes[idx1], [-1]), tf.reshape(codes[idx2], [-1]))
+
+            df = tf.cast(codes[idx1] - codes[idx2], tf.float32)
+            inputs_sbd = tf.sqrt(tf.reduce_sum(tf.square(df)) + 1.0e-12) # euclidien distance
+
+            codes_sbd = _sbd_tf(tf.reshape(decodes[idx1], [-1]), tf.reshape(decodes[idx2], [-1]))
             # print(inputs_sbd, codes_sbd)
             diff += tf.math.square(tf.subtract(inputs_sbd, codes_sbd))
             # codes_dist = tf.add(_sbd_tf(tf.reshape(codes[idx1], [-1]), tf.reshape(codes[idx2], [-1])), codes_dist)
@@ -268,7 +272,7 @@ class AutoEncoder:
         # dist_mse = mean_squared_error(codes_dist, true_dist)
         # return tf.math.square(codes_dist-true_dist)
 
-        return diff
+        return diff / len(idx_combination)
 
 
 
@@ -287,9 +291,9 @@ def train_step(inputs, auto_encoder, optimizer=_optimizer, loss=_mse_loss, ld = 
         if ld == 1:
             similarity_loss = 0
         else:
-            similarity_loss = auto_encoder.similarity_loss(inputs, codes)
+            similarity_loss = auto_encoder.similarity_loss(codes, decodes)
 
-        # print('loss')
+        print('loss: ', loss, similarity_loss)
         # print(loss)
         # print(similarity_loss)
         total_loss = ld * loss + (1 - ld) * similarity_loss
