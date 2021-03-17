@@ -75,7 +75,7 @@ ae = AutoEncoder(**kwargs)
 # %%
 
 EPOCHS = 100
-BATCH = len(X_train)
+BATCH = 10
 SHUFFLE_BUFFER = 100
 K = len(set(y_train))
 
@@ -88,8 +88,8 @@ for epoch in range(EPOCHS):
     total_loss = 0
     for i, (input, _) in enumerate(train_dataset):
         # lamda = 0 all similarity
-        loss = train_step(input, ae, ld = 1)
-    total_loss += loss
+        loss = train_step(input, ae, ld = 0.5)
+        total_loss += loss
     loss_history.append(total_loss)
     print("Epoch {}: {}".format(epoch, total_loss))
 
@@ -171,6 +171,7 @@ for b, c in zip(baseline_11nn, code_11nn):
     c = set(c[1:])
     result.append(len(b.intersection(c)))
 np.array(result).mean()
+print(np.array(result).mean())
 
 # %%
 

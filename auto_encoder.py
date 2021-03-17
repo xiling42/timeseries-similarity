@@ -246,35 +246,60 @@ class AutoEncoder:
         # batch [10,x,x] -> [C10 2, x, x]
 
         idx_combination = list(it.combinations([i for i in range(len(codes))], 2))
+        idx1s = [ch[0] for ch in idx_combination]
+        idx2s = [ch[1] for ch in idx_combination]
         # print('l idx: ', len(idx_combination))
         idx_list_1, idx_list_2 = [list(c) for c in zip(*idx_combination)]
-        codes_dist = tf.convert_to_tensor(0.0)
+        codes_dist = tf.convert_to_tensor(0)
         true_dist = tf.convert_to_tensor(0.0)
 
-        diff = tf.convert_to_tensor(0.0)
+        # x, y = [batch * timestams]
 
+        # X, Y = tf.meshgrid(codes, decodes)
+        #
+        # df = tf.cast(X - Y, tf.float32)
+        # inputs_euclidean = tf.sqrt(tf.reduce_sum(tf.square(df)) + 1.0e-12)  # euclidean distance
+        # print(df.shape)
+        # apprx_dist = np.linalg.norm(codes_dist - true_dist, axis=1)
+
+        diff = tf.convert_to_tensor(0.0)
+        # print(codes[idx1s])
+        # codes_diffs = tf.map_fn(self._calculate_euclidean_diff, (codes[idx1s], codes[idx2s]))
+        # decodes_diffs = tf.map_fn(self._calculate_similarity_diff, (decodes[idx1s], decodes[idx2s]))
         for i in range(len(idx_combination)):
             idx1, idx2 = idx_combination[i]
-            # inputs_sbd = _sbd_tf(tf.reshape(codes[idx1], [-1]), tf.reshape(codes[idx2], [-1]))
+            # inputs_euclidean = _sbd_tf(tf.reshape(codes[idx1], [-1]), tf.reshape(codes[idx2], [-1]))
 
             df = tf.cast(codes[idx1] - codes[idx2], tf.float32)
-            inputs_sbd = tf.sqrt(tf.reduce_sum(tf.square(df)) + 1.0e-12) # euclidien distance
+            inputs_euclidean = tf.sqrt(tf.reduce_sum(tf.square(df)) + 1.0e-12) # euclidean distance
 
             codes_sbd = _sbd_tf(tf.reshape(decodes[idx1], [-1]), tf.reshape(decodes[idx2], [-1]))
-            # print(inputs_sbd, codes_sbd)
-            diff += tf.math.square(tf.subtract(inputs_sbd, codes_sbd))
+            # print(inputs_euclidean, codes_sbd)
+            diff += tf.math.square(tf.subtract(inputs_euclidean, codes_sbd))
             # codes_dist = tf.add(_sbd_tf(tf.reshape(codes[idx1], [-1]), tf.reshape(codes[idx2], [-1])), codes_dist)
-            # codes_dist.append(_sbd_tf(codes[idx1], codes[idx2]))
+            # codes_dist.append(_sbd_tf(decodes[idx1], decodes[idx2]))
             # true_dist = tf.add( _sbd_tf(tf.reshape(inputs[idx1], [-1]), tf.reshape(inputs[idx2], [-1])), true_dist)
-            # true_dist.append(_sbd_tf(tf.reshape(inputs[idx1], [-1]), tf.reshape(inputs[idx2], [-1])))
+            # true_dist.append(inputs_euclidean)
 
         # dist_mae = mean_absolute_error(codes_dist, true_dist)
         # dist_mse = mean_squared_error(codes_dist, true_dist)
         # return tf.math.square(codes_dist-true_dist)
 
         return diff / len(idx_combination)
+        # apprx_dist = np.linalg.norm(codes_dist - true_dist, axis=1)
+        # dist_mae = mean_absolute_error(apprx_dist, true_dist)
+        # return diff
+        # return tf.keras.losses.MeanSquaredError(codes_diffs, decodes_diffs)
+
+    def _calculate_euclidean_diff(self, x, y):
+        df = tf.cast(x - y, tf.float32)
+        euclidean = tf.sqrt(tf.reduce_sum(tf.square(df)) + 1.0e-12)  # euclidien distance
+        return euclidean
 
 
+    def _calculate_similarity_diff(self, x, y):
+        codes_sbd = _sbd_tf(tf.reshape(x, [-1]), tf.reshape(y, [-1]))
+        return codes_sbd
 
 
 
@@ -291,7 +316,7 @@ def train_step(inputs, auto_encoder, optimizer=_optimizer, loss=_mse_loss, ld = 
         if ld == 1:
             similarity_loss = 0
         else:
-            similarity_loss = auto_encoder.similarity_loss(codes, decodes)
+            similarity_loss = auto_encoder.similarity_loss(inputs, codes)
 
         print('loss: ', loss, similarity_loss)
         # print(loss)
