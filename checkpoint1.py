@@ -15,6 +15,22 @@ X_train, y_train, X_test, y_test, info = py_ts_data.load_data("GunPoint", variab
 print("Dataset shape: Train: {}, Test: {}".format(X_train.shape, X_test.shape))
 
 
+def augmentation(x, y, lower_bond = -0.01, upper_bond = 0.01, limits = 2000):
+    size = x.shape
+
+    if size[0] > limits: # limits is data augmentation limits
+        return x, y
+
+    new_x = [x]
+    new_y = [y]
+    for i in range(limits // size[0]):
+        new_x.append(x + np.random.uniform(lower_bond, upper_bond, size))
+        new_y.append(y)
+
+    x = np.concatenate(new_x, axis=0)
+    y = np.concatenate(new_y, axis =0)
+    return x, y
+
 # %%
 
 def min_max(data, feature_range=(0, 1)):
@@ -61,7 +77,7 @@ def normalize(data):
 
 kwargs = {
     "input_shape": (X_train.shape[1], X_train.shape[2]),
-    "filters": [128, 64, 32],
+    "filters": [32, 64, 128],
     "kernel_sizes": [5, 5, 5],
     "code_size": 16,
 }
@@ -79,6 +95,9 @@ BATCH = 10
 SHUFFLE_BUFFER = 100
 K = len(set(y_train))
 
+
+# X_train, y_train = augmentation(X_train, y_train)
+
 train_dataset = tf.data.Dataset.from_tensor_slices((X_train, y_train))
 train_dataset = train_dataset.shuffle(SHUFFLE_BUFFER).batch(BATCH)
 
@@ -87,13 +106,15 @@ loss_history = []
 for epoch in range(EPOCHS):
     total_loss = 0
     for i, (input, _) in enumerate(train_dataset):
-        # lamda = 0 all similarity
-        loss = train_step(input, ae, ld = 0.5)
+        loss = train_step(input, ae, ld = 0) # 0 not use similarity
         total_loss += loss
     loss_history.append(total_loss)
+    # print("Epoch {}: {}".format(epoch, total_loss), end="\r")
     print("Epoch {}: {}".format(epoch, total_loss))
 
+plt.subplot(1,2,1)
 plt.plot(loss_history)
+
 
 # %%
 
@@ -130,6 +151,7 @@ X_train[0].shape
 code_test = ae.encode(X_test)
 decoded_test = ae.decode(code_test)
 
+plt.subplot(1,2,2)
 plt.plot(X_test[0])
 plt.plot(decoded_test[0])
 plt.show()
@@ -170,8 +192,7 @@ for b, c in zip(baseline_11nn, code_11nn):
     b = set(b[1:])
     c = set(c[1:])
     result.append(len(b.intersection(c)))
-np.array(result).mean()
-print(np.array(result).mean())
+print('common items: ', np.array(result).mean())
 
 # %%
 

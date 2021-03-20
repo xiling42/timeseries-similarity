@@ -40,7 +40,7 @@ class Encoder(tf.keras.Model):
         self.out = tf.keras.layers.Dense(code_size)
 
     def call(self, inputs, training=False):
-
+        # print(inputs.shape)
         x = self.convs[0](inputs)
         x = self.norms[0](x)
         for conv, norm in zip(self.convs[1:], self.norms[1:]):
@@ -51,9 +51,8 @@ class Encoder(tf.keras.Model):
         x = self.flatten(x)
 
         x = self.out(x)
+        # print(x.shape)
         return x
-
-
 
 
 class Decoder(tf.keras.Model):
@@ -83,18 +82,19 @@ class Decoder(tf.keras.Model):
             self.norms.append(b)
 
     def call(self, inputs, training=False):
+        # print(inputs.shape)
         x = self.expand(inputs)
         x = self.reshape(x)
         for conv, norm in zip(self.convs, self.norms):
             x = norm(x, training=training)
             x = conv(x)
         assert self.expected_output_shape == x.shape[1:]
+        # print(x.shape)
         return x
 
 
 _optimizer = tf.keras.optimizers.Nadam(learning_rate=0.00015)
 _mse_loss = tf.keras.losses.MeanSquaredError()
-
 
 
 def _ncc_c_tf(x, y):
@@ -121,7 +121,7 @@ def _ncc_c_tf(x, y):
 
     x_len = len(x)
     y_len = len(y)
-    fft_size = 1 << (2*x_len-1).bit_length()
+    fft_size = 1 << (2 * x_len - 1).bit_length()
     # print("fft size", fft_size)
     # cc = ifft(fft(x, fft_size) * np.conj(fft(y, fft_size)))
     # print(x)
@@ -146,7 +146,7 @@ def _ncc_c_tf(x, y):
     # if y_len > fft_size:
     #     y = y[ :fft_size]
     # print(y)
-    x = tf.cast(x, dtype =tf.complex64)
+    x = tf.cast(x, dtype=tf.complex64)
     y = tf.cast(y, dtype=tf.complex64)
     cc = tf.signal.ifft(tf.signal.fft(x) * tf.math.conj(tf.signal.fft(y)))
 
@@ -157,37 +157,72 @@ def _ncc_c_tf(x, y):
 
     # print(cc)
     # print(cc.dtype)
-    cc = tf.concat((cc[-(x_len-1):], cc[:x_len]), axis = 0)
+    cc = tf.concat((cc[-(x_len - 1):], cc[:x_len]), axis=0)
     # print(cc)
-    cc = tf.cast(cc, dtype = 'float32')
+    cc = tf.cast(cc, dtype=tf.complex128)
     # cc = tf.dtypes.cast(cc, dtype=tf.complex128)
 
     return tf.math.real(cc) / den
 
-# def _ncc_c(x, y):
-#     """
-#     >>> _ncc_c([1,2,3,4], [1,2,3,4])
-#     array([ 0.13333333,  0.36666667,  0.66666667,  1.        ,  0.66666667,
-#             0.36666667,  0.13333333])
-#     >>> _ncc_c([1,1,1], [1,1,1])
-#     array([ 0.33333333,  0.66666667,  1.        ,  0.66666667,  0.33333333])
-#     >>> _ncc_c([1,2,3], [-1,-1,-1])
-#     array([-0.15430335, -0.46291005, -0.9258201 , -0.77151675, -0.46291005])
-#     """
-#     den = np.array(norm(x) * norm(y))
-#     den[den == 0] = np.Inf
-#     den = tf.convert_to_tensor(den)
-#
-#     x_len = len(x)
-#     fft_size = 1 << (2*x_len-1).bit_length()
-#     # print(fft_size)
-#     # # print('fft', tf.signal.fft(x, fft_size))
-#     # print(tf.signal.fft(x))
-#     # print(tf.conj(tf.signal.fft(y)))
-#     # print('i: ', tf.signal.fft(x) * tf.conj(tf.signal.fft(y)))
-#     cc = tf.signal.ifft(tf.signal.fft(x) * tf.conj(tf.signal.fft(y)))
-#     cc = tf.concatenate((cc[-(x_len-1):], cc[:x_len]))
-#     return tf.math.real(cc) / den
+
+def _ncc_c_tf_v1(x, y):
+    """
+    >>> _ncc_c([1,2,3,4], [1,2,3,4])
+    array([ 0.13333333,  0.36666667,  0.66666667,  1.        ,  0.66666667,
+            0.36666667,  0.13333333])
+    >>> _ncc_c([1,1,1], [1,1,1])
+    array([ 0.33333333,  0.66666667,  1.        ,  0.66666667,  0.33333333])
+    >>> _ncc_c([1,2,3], [-1,-1,-1])
+    array([-0.15430335, -0.46291005, -0.9258201 , -0.77151675, -0.46291005])
+    """
+    den = np.array(norm(x) * norm(y))
+    # den = tf.convert_to_tensor(den)
+    # den = tf.Variable(tf.linalg.normalize(x), tf.linalg.normalize(y))
+    # print("norm x y ",norm(x), norm(y), "den: ", den)
+    den[den == 0] = np.Inf
+    den = tf.convert_to_tensor(den)
+    # print("norm x y ",norm(x), norm(y), "den: ", den)
+
+    x_len = len(x)
+    y_len = len(y)
+    fft_size = 1 << (2 * x_len - 1).bit_length()
+    # print("fft size", fft_size)
+    # cc = ifft(fft(x, fft_size) * np.conj(fft(y, fft_size)))
+    # print(x)
+    if x_len < fft_size:
+        for i in range(fft_size - x_len):
+            # x.append(0)
+            x = np.append(x, np.array([0]))
+    if x_len > fft_size:
+        x = x[:fft_size]
+    # print(x)
+    if y_len < fft_size:
+        for i in range(fft_size - y_len):
+            # y.append(0)
+            y = np.append(y, np.array([0]))
+    if y_len > fft_size:
+        y = y[:fft_size]
+    # print(y)
+    x = tf.cast(x, dtype=tf.complex64)
+    y = tf.cast(y, dtype=tf.complex64)
+    cc = tf.signal.ifft(tf.signal.fft(x) * tf.math.conj(tf.signal.fft(y)))
+    # cc = np.concatenate((cc[-(x_len-1):], cc[:x_len]))
+    # print("x ", tf.signal.fft(x, fft_size), "   len", len(tf.signal.fft(x, fft_size)), " ", tf.signal.fft(x, fft_size).dtype)
+    # print("y ", tf.signal.fft(y, fft_size), "   len", len(tf.signal.fft(x, fft_size)))
+    # print("conj y ", tf.math.conj(tf.signal.fft(y, fft_size)), "   len", len(tf.math.conj(tf.signal.fft(y, fft_size))), " ", tf.math.conj(tf.signal.fft(y, fft_size)).dtype)
+
+    # print(cc)
+    # print(cc.dtype)
+    cc = tf.concat((cc[-(x_len - 1):], cc[:x_len]), axis=0)
+    # print(cc)
+    cc = tf.dtypes.cast(cc, dtype=tf.complex128)  # 64?
+    den = tf.dtypes.cast(den, dtype='float64')  # 32?
+    # print(cc.dtype)
+    # return np.real(cc) / den
+    # print(tf.math.real(cc).dtype)
+    # print(den.dtype)
+    return tf.math.real(cc) / den
+
 
 def _sbd_tf(x, y):
     """
@@ -198,7 +233,7 @@ def _sbd_tf(x, y):
     >>> _sbd([1,2,3], [0,1,2])
     (0.043817112532485103, array([0, 1, 2]))
     """
-    ncc = _ncc_c_tf(x, y)
+    ncc = _ncc_c_tf_v1(x, y)
     # print("ncc_tf  ",ncc)
     # idx = ncc.argmax()
     # print(ncc, "   ", idx)
@@ -210,6 +245,174 @@ def _sbd_tf(x, y):
     # yshift_tf = roll_zeropad_tf(y, (idx + 1) - max(len(x), len(y)))
 
     return dist
+
+
+def _sbd_tf_2d(x, y):
+    """
+    >>> _sbd([1,1,1], [1,1,1])
+    (-2.2204460492503131e-16, array([1, 1, 1]))
+    >>> _sbd([0,1,2], [1,2,3])
+    (0.043817112532485103, array([1, 2, 3]))
+    >>> _sbd([1,2,3], [0,1,2])
+    (0.043817112532485103, array([0, 1, 2]))
+    """
+    # print(x.dtype, y.dtype)
+    ncc = _ncc_c_3dim_tf(x, y)
+    ncc = tf.reshape(ncc, (-1, ncc.shape[2]))
+    # print("ncc_tf  ",ncc)
+    # idx = ncc.argmax()
+    # print(ncc)
+    ncc_max = tf.reduce_max(ncc, axis=1)
+    # print(ncc_max)
+    dist = 1 - ncc_max
+    # dist = 1 - ncc_max + 1.0e-12 # ????
+
+    return dist
+
+
+def _ncc_c_3dim(x, y):
+    """
+    Variant of NCCc that operates with 2 dimensional X arrays and 2 dimensional
+    y vector
+    Returns a 3 dimensional array of normalized fourier transforms
+    """
+    den = norm(x, axis=1)[:, None] * norm(y, axis=1)
+    den[den == 0] = np.Inf
+    x_len = x.shape[-1]
+    fft_size = 1 << (2*x_len-1).bit_length()
+    cc = ifft(fft(x, fft_size) * np.conj(fft(y, fft_size))[:, None])
+    cc = np.concatenate((cc[:,:,-(x_len-1):], cc[:,:,:x_len]), axis=2)
+    return np.real(cc) / den.T[:, :, None]
+
+
+def _ncc_c_3dim_tf(x, y):
+    """
+    Variant of NCCc that operates with 2 dimensional X arrays and 2 dimensional
+    y vector
+    Returns a 3 dimensional array of normalized fourier transforms
+    """
+    # print("-----ncc3_tf-----")
+    den = den = np.array(norm(x, axis=1)[:, None] * norm(y, axis=1))
+    den[den == 0] = np.Inf
+    den = tf.convert_to_tensor(den, dtype = tf.float64)
+    # print("den ", den)
+    # print("den.T ", tf.transpose(den)[:, :, None])
+    x_len = x.shape[-1]
+    fft_size = 1 << (2 * x_len - 1).bit_length()
+    # print("x_len ", x_len, "  fft size: ", fft_size)
+
+    # new_x = tf.zeros(fft_size)
+    # print('vs: ', new_x)
+    # temp = [[1], [1,2]]
+    new_x = tf.convert_to_tensor(tf.keras.preprocessing.sequence.pad_sequences(
+        x, maxlen=fft_size, dtype='float64', padding='post',
+        truncating='post', value=0.0
+    ))
+    # print("new x ", new_x)
+    # print("x: ", x)
+
+    new_y = tf.convert_to_tensor(tf.keras.preprocessing.sequence.pad_sequences(
+        y, maxlen=fft_size, dtype='float64', padding='post',
+        truncating='post', value=0.0
+    ))
+    # print("new y ", new_y)
+    # print("y: ", y)
+
+    new_x = tf.cast(new_x, dtype=tf.complex128)
+    new_y = tf.cast(new_y, dtype=tf.complex128)
+
+    # cc = ifft(fft(x, fft_size) * np.conj(fft(y, fft_size))[:, None])
+    cc = tf.signal.ifft(tf.signal.fft(new_x) * tf.math.conj(tf.signal.fft(new_y))[:, None])
+    # print("fft x: ", tf.math.conj(tf.signal.fft(new_y)))
+
+    # print("cc: ", cc)
+    # cc = np.concatenate((cc[:,:,-(x_len-1):], cc[:,:,:x_len]), axis=2)
+    cc = tf.concat((cc[:, :, -(x_len - 1):], cc[:, :, :x_len]), axis=2)
+    # print("cc concatenate: ", cc)
+    return tf.math.real(cc) / tf.transpose(den)[:, :, None]
+
+
+def euclidean(a, b, sqrt=False):
+    aTa = tf.linalg.diag_part(tf.matmul(a, tf.transpose(a)))
+    bTb = tf.linalg.diag_part(tf.matmul(b, tf.transpose(b)))
+    aTb = tf.matmul(a, tf.transpose(b))
+    ta = tf.reshape(aTa, [-1, 1])
+    tb = tf.reshape(bTb, [1, -1])
+
+    D = ta - 2.0 * aTb + tb
+    if sqrt:
+        D = tf.sqrt(D)
+    return D
+
+
+def euclideanDistances(A, B):
+    BT = B.transpose()
+    # vecProd = A * BT
+    vecProd = np.dot(A, BT)
+    # print(vecProd)
+    SqA = A ** 2
+    # print(SqA)
+    sumSqA = np.matrix(np.sum(SqA, axis=1))
+    sumSqAEx = np.tile(sumSqA.transpose(), (1, vecProd.shape[1]))
+    # print(sumSqAEx)
+
+    SqB = B ** 2
+    sumSqB = np.sum(SqB, axis=1)
+    sumSqBEx = np.tile(sumSqB, (vecProd.shape[0], 1))
+    SqED = sumSqBEx + sumSqAEx - 2 * vecProd
+    SqED[SqED < 0] = 0.0
+    ED = np.sqrt(SqED)
+    return ED
+
+def _ncc_c(x, y):
+    """
+    >>> _ncc_c([1,2,3,4], [1,2,3,4])
+    array([ 0.13333333,  0.36666667,  0.66666667,  1.        ,  0.66666667,
+            0.36666667,  0.13333333])
+    >>> _ncc_c([1,1,1], [1,1,1])
+    array([ 0.33333333,  0.66666667,  1.        ,  0.66666667,  0.33333333])
+    >>> _ncc_c([1,2,3], [-1,-1,-1])
+    array([-0.15430335, -0.46291005, -0.9258201 , -0.77151675, -0.46291005])
+    """
+    den = np.array(norm(x) * norm(y))
+    # print("norm x y ",norm(x), norm(y), "den: ", den)
+    den[den == 0] = np.Inf
+    # print("norm x y ",norm(x), norm(y), "den: ", den)
+
+    x_len = len(x)
+    fft_size = 1 << (2 * x_len - 1).bit_length()
+    # print("fft size", fft_size)
+    cc = ifft(fft(x, fft_size) * np.conj(fft(y, fft_size)))
+    # print("x ", fft(x, fft_size), "   len", len(fft(x, fft_size)), " ", fft(x, fft_size).dtype)
+    # print("y ", fft(y, fft_size), "   len", len(fft(x, fft_size)))
+    # print("conj y ", np.conj(fft(y, fft_size)), "   len", len(np.conj(fft(y, fft_size))))
+    # print(cc)
+    # print(cc.dtype)
+    cc = np.concatenate((cc[-(x_len - 1):], cc[:x_len]))
+    # print(cc)
+    # print(cc.dtype)
+    # print((np.real(cc) / den).dtype)
+    return np.real(cc) / den
+
+
+def _sbd(x, y):
+    """
+    >>> _sbd([1,1,1], [1,1,1])
+    (-2.2204460492503131e-16, array([1, 1, 1]))
+    >>> _sbd([0,1,2], [1,2,3])
+    (0.043817112532485103, array([1, 2, 3]))
+    >>> _sbd([1,2,3], [0,1,2])
+    (0.043817112532485103, array([0, 1, 2]))
+    """
+    ncc = _ncc_c(x, y)
+    idx = ncc.argmax()
+    # print("ncc ", ncc, "   ", idx)
+    dist = 1 - ncc[idx]
+    # yshift = roll_zeropad(y, (idx + 1) - max(len(x), len(y)))
+
+    # yshift_tf = roll_zeropad_tf(y, (idx + 1) - max(len(x), len(y)))
+    return dist
+
 
 class AutoEncoder:
     def __init__(self, **kwargs):
@@ -241,90 +444,115 @@ class AutoEncoder:
         self.loss = loss
         self.optimizer = optimizer
 
+
+
     def similarity_loss(self, codes, decodes):
         # batchs size * timestamp size * variable size  ?? flatten?
         # batch [10,x,x] -> [C10 2, x, x]
 
-        idx_combination = list(it.combinations([i for i in range(len(codes))], 2))
-        idx1s = [ch[0] for ch in idx_combination]
-        idx2s = [ch[1] for ch in idx_combination]
+        # idx_combination = list(it.combinations([i for i in range(len(decodes))], 2))
         # print('l idx: ', len(idx_combination))
-        idx_list_1, idx_list_2 = [list(c) for c in zip(*idx_combination)]
-        codes_dist = tf.convert_to_tensor(0)
-        true_dist = tf.convert_to_tensor(0.0)
+        # idx_list_1, idx_list_2 = [list(c) for c in zip(*idx_combination)]
+        # codes_dist = tf.convert_to_tensor(0.0)
+        # true_dist = tf.convert_to_tensor(0.0)
 
-        # x, y = [batch * timestams]
+        # diff = tf.convert_to_tensor(0.0)
 
-        # X, Y = tf.meshgrid(codes, decodes)
+        # ed
+        # diff = tf.cast(l_codes-r_codes, tf.float64)
+        # code_distances = tf.sqrt(tf.reduce_sum(tf.square(diff), axis=1)  + 1.0e-12)
+
+        sbd_distances = _sbd_tf_2d(tf.reshape(decodes, (decodes.shape[0], -1)), tf.reshape(decodes, (decodes.shape[0], -1)))
+        # distances = euclidean(tf.reshape(codes, (codes.shape[0], -1)), tf.reshape(codes, (codes.shape[0], -1)), True)
+        d2 = euclideanDistances(tf.reshape(codes, (codes.shape[0], -1)).numpy(), tf.reshape(codes, (codes.shape[0], -1)).numpy())
+
+
         #
-        # df = tf.cast(X - Y, tf.float32)
-        # inputs_euclidean = tf.sqrt(tf.reduce_sum(tf.square(df)) + 1.0e-12)  # euclidean distance
-        # print(df.shape)
-        # apprx_dist = np.linalg.norm(codes_dist - true_dist, axis=1)
+        # for i in range(len(idx_combination)):
+        #     idx1, idx2 = idx_combination[i]
+        #     # codes_sbd = _sbd_tf(tf.reshape(codes[idx1], [-1]), tf.reshape(codes[idx2], [-1])) # change to ED
+        #     # inputs_sbd = _sbd_tf(tf.reshape(inputs[idx1], [-1]), tf.reshape(inputs[idx2], [-1])) # change to decoder
+        #
+        #     decode_sbd = _sbd_tf(tf.reshape(decodes[idx1], [-1]), tf.reshape(decodes[idx2], [-1]))
+        #     ed_diff = tf.cast(tf.reshape(codes[idx1], [-1]) - tf.reshape(codes[idx2], [-1]), tf.float32)
+        #     codes_ed = tf.sqrt(tf.reduce_sum(tf.square(ed_diff), axis=0) + 1.0e-12)
+        #     # codes_sbd = _sbd_tf(tf.reshape(codes[idx1], [-1]), tf.reshape(codes[idx2], [-1]))
+        #
+        #     decode_sbd = tf.cast(decode_sbd, dtype=tf.float32)
+        #     # print(decode_sbd, codes_ed)
+        #     # print(decode_sbd.dtype,codes_ed.dtype)
+        #     diff += tf.math.square(tf.subtract(decode_sbd, codes_ed))
+        #     # codes_dist = tf.add(_sbd_tf(tf.reshape(codes[idx1], [-1]), tf.reshape(codes[idx2], [-1])), codes_dist)
+        #     # codes_dist.append(_sbd_tf(codes[idx1], codes[idx2]))
+        #     # true_dist = tf.add( _sbd_tf(tf.reshape(inputs[idx1], [-1]), tf.reshape(inputs[idx2], [-1])), true_dist)
+        #     # true_dist.append(_sbd_tf(tf.reshape(inputs[idx1], [-1]), tf.reshape(inputs[idx2], [-1])))
+        #
+        # # dist_mae = mean_absolute_error(codes_dist, true_dist)
+        # # dist_mse = mean_squared_error(codes_dist, true_dist)
+        # # return tf.math.square(codes_dist-true_dist)
 
-        diff = tf.convert_to_tensor(0.0)
-        # print(codes[idx1s])
-        # codes_diffs = tf.map_fn(self._calculate_euclidean_diff, (codes[idx1s], codes[idx2s]))
-        # decodes_diffs = tf.map_fn(self._calculate_similarity_diff, (decodes[idx1s], decodes[idx2s]))
-        for i in range(len(idx_combination)):
-            idx1, idx2 = idx_combination[i]
-            # inputs_euclidean = _sbd_tf(tf.reshape(codes[idx1], [-1]), tf.reshape(codes[idx2], [-1]))
+        l =  tf.keras.losses.MSE(sbd_distances, tf.reshape(d2,[-1]))
+        # loss_out = l(sbd_distances, tf.reshape(d2,[-1]))
+        return l
 
-            df = tf.cast(codes[idx1] - codes[idx2], tf.float32)
-            inputs_euclidean = tf.sqrt(tf.reduce_sum(tf.square(df)) + 1.0e-12) # euclidean distance
-
-            codes_sbd = _sbd_tf(tf.reshape(decodes[idx1], [-1]), tf.reshape(decodes[idx2], [-1]))
-            # print(inputs_euclidean, codes_sbd)
-            diff += tf.math.square(tf.subtract(inputs_euclidean, codes_sbd))
-            # codes_dist = tf.add(_sbd_tf(tf.reshape(codes[idx1], [-1]), tf.reshape(codes[idx2], [-1])), codes_dist)
-            # codes_dist.append(_sbd_tf(decodes[idx1], decodes[idx2]))
-            # true_dist = tf.add( _sbd_tf(tf.reshape(inputs[idx1], [-1]), tf.reshape(inputs[idx2], [-1])), true_dist)
-            # true_dist.append(inputs_euclidean)
-
-        # dist_mae = mean_absolute_error(codes_dist, true_dist)
-        # dist_mse = mean_squared_error(codes_dist, true_dist)
-        # return tf.math.square(codes_dist-true_dist)
-
-        return diff / len(idx_combination)
-        # apprx_dist = np.linalg.norm(codes_dist - true_dist, axis=1)
-        # dist_mae = mean_absolute_error(apprx_dist, true_dist)
-        # return diff
-        # return tf.keras.losses.MeanSquaredError(codes_diffs, decodes_diffs)
-
-    def _calculate_euclidean_diff(self, x, y):
-        df = tf.cast(x - y, tf.float32)
-        euclidean = tf.sqrt(tf.reduce_sum(tf.square(df)) + 1.0e-12)  # euclidien distance
-        return euclidean
-
-
-    def _calculate_similarity_diff(self, x, y):
-        codes_sbd = _sbd_tf(tf.reshape(x, [-1]), tf.reshape(y, [-1]))
-        return codes_sbd
 
 
 
 # @tf.function
-def train_step(inputs, auto_encoder, optimizer=_optimizer, loss=_mse_loss, ld = 0.5):
+def train_step(inputs, auto_encoder, optimizer=_optimizer, loss=_mse_loss, ld=0.5):
     # print('---')
-
 
     with tf.GradientTape() as tape:
 
         codes = auto_encoder.encode(inputs, training=True)
         decodes = auto_encoder.decode(codes, training=True)
         loss = loss(inputs, decodes)
-        if ld == 1:
+        if ld == 0:
             similarity_loss = 0
         else:
-            similarity_loss = auto_encoder.similarity_loss(inputs, codes)
+            similarity_loss = auto_encoder.similarity_loss(codes, decodes)
 
-        print('loss: ', loss, similarity_loss)
-        # print(loss)
+        # print('loss')
         # print(similarity_loss)
-        total_loss = ld * loss + (1 - ld) * similarity_loss
+        # print("reconstruction loss: ", loss, " ", "similarity_loss: ", similarity_loss)
+
+        total_loss = loss + ld * similarity_loss
+        # total_loss = loss + (1e-1) * similarity_loss
         # total_loss = similarity_loss # use this line to check if similarity loss correctly implemented
         trainables = auto_encoder.encode.trainable_variables + auto_encoder.decode.trainable_variables
         # total_loss = tf.convert_to_tensor(0)
     gradients = tape.gradient(total_loss, trainables)
     optimizer.apply_gradients(zip(gradients, trainables))
-    return loss
+    return total_loss
+
+
+def main():
+    x = [1, 1, 1]
+    y = [1, 1, 1]
+    # x = [1,2,3,4]
+    # y = [1,2,3,4]
+    import py_ts_data
+
+    X_train, y_train, X_test, y_test, info = py_ts_data.load_data("Libras", variables_as_channels=True)
+    print("Dataset shape: Train: {}, Test: {}".format(X_train.shape, X_test.shape))
+
+    print("sbd: ")
+    dist = _sbd(np.reshape(X_train[3], [-1]), np.reshape(X_train[0], [-1]))
+    print("dist ", dist)
+    dist_tf = _sbd_tf(tf.reshape(X_train[3], [-1]), tf.reshape(X_train[0], [-1]))
+    print("dist tf ", dist_tf)
+
+    dist_tf_2d = _sbd_tf_2d(tf.reshape(X_train, (X_train.shape[0], -1)), tf.reshape(X_train, (X_train.shape[0], -1)))
+    # print(tf.reshape(X_train, (X_train.shape[0], -1)))
+    # print(X_train[:10].shape)
+    print("dist 2d tf ", dist_tf_2d)
+
+    # idx_combination = list(it.combinations([i for i in range(10)], 2))
+    # print('l idx: ', idx_combination )
+
+
+if __name__ == "__main__":
+    # import sys
+    # import doctest
+    # sys.exit(doctest.testmod()[0])
+    main()
