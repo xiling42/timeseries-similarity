@@ -91,12 +91,12 @@ ae = AutoEncoder(**kwargs)
 # %%
 
 EPOCHS = 100
-BATCH = 10
+BATCH = 20
 SHUFFLE_BUFFER = 100
 K = len(set(y_train))
 
 
-# X_train, y_train = augmentation(X_train, y_train)
+X_train, y_train = augmentation(X_train, y_train)
 
 train_dataset = tf.data.Dataset.from_tensor_slices((X_train, y_train))
 train_dataset = train_dataset.shuffle(SHUFFLE_BUFFER).batch(BATCH)
@@ -106,7 +106,7 @@ loss_history = []
 for epoch in range(EPOCHS):
     total_loss = 0
     for i, (input, _) in enumerate(train_dataset):
-        loss = train_step(input, ae, ld = 0) # 0 not use similarity
+        loss = train_step(input, ae, ld = 0.5) # 0 not use similarity
         total_loss += loss
     loss_history.append(total_loss)
     # print("Epoch {}: {}".format(epoch, total_loss), end="\r")
