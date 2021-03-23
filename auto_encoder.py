@@ -536,69 +536,21 @@ class AutoEncoder:
     #     return diff / len(idx_combination)
 
     def similarity_loss(self, codes, decodes):
-        # batchs size * timestamp size * variable size  ?? flatten?
-        # batch [10,x,x] -> [C10 2, x, x]
 
-        idx_combination = list(it.combinations([i for i in range(len(decodes))], 2))
-        # print('l idx: ', len(idx_combination))
-        idx_list_1, idx_list_2 = [list(c) for c in zip(*idx_combination)]
-        # codes_dist = tf.convert_to_tensor(0.0)
-        # true_dist = tf.convert_to_tensor(0.0)
+        combination_length = (len(codes) * len(codes) - len(codes)) / 2
 
-        # diff = tf.convert_to_tensor(0.0)
-
-        # ed
-        # diff = tf.cast(l_codes-r_codes, tf.float64)
-        # code_distances = tf.sqrt(tf.reduce_sum(tf.square(diff), axis=1)  + 1.0e-12)
-
-        # x, y = codes.numpy()[idx_list_1, :], codes.numpy()[idx_list_2, :]
-        # a,b = decodes.numpy()[idx_list_1, :], decodes.numpy()[idx_list_2, :]
-
-        # sbd_distances = _sbd_ling(decodes.numpy(), decodes.numpy())
-        # sbd_temp = tf.reshape(sbd_distances, (3,-1))
         sbd_distances = _sbd_tf_2d(tf.reshape(decodes, (decodes.shape[0], -1)),
                                    tf.reshape(decodes, (decodes.shape[0], -1)))
+        sbd_reshape = tf.reshape(sbd_distances, (len(codes), -1))
 
-        # a = tf.cast(tf.reshape(codes, (codes.shape[0], -1)), tf.float32)
         d2 = euclidean(tf.reshape(codes, (codes.shape[0], -1)), tf.reshape(codes, (codes.shape[0], -1)), True)
-        # d2 = euclideanDistances(codes.numpy(), codes.numpy())
-        # d2 = d2 + + 1.0e-12
 
+        with_diagonal = tf.linalg.band_part(sbd_reshape - d2, -1, 0)
+        without_diagonal = tf.linalg.set_diag(with_diagonal, [0 for i in range(len(codes))])
 
-        #
-        # for i in range(len(idx_combination)):
-        #     idx1, idx2 = idx_combination[i]
-        #     # codes_sbd = _sbd_tf(tf.reshape(codes[idx1], [-1]), tf.reshape(codes[idx2], [-1])) # change to ED
-        #     # inputs_sbd = _sbd_tf(tf.reshape(inputs[idx1], [-1]), tf.reshape(inputs[idx2], [-1])) # change to decoder
-        #
-        #     decode_sbd = _sbd_tf(tf.reshape(decodes[idx1], [-1]), tf.reshape(decodes[idx2], [-1]))
-        #     ed_diff = tf.cast(tf.reshape(codes[idx1], [-1]) - tf.reshape(codes[idx2], [-1]), tf.float32)
-        #     codes_ed = tf.sqrt(tf.reduce_sum(tf.square(ed_diff), axis=0) + 1.0e-12)
-        #     # codes_sbd = _sbd_tf(tf.reshape(codes[idx1], [-1]), tf.reshape(codes[idx2], [-1]))
-        #
-        #     decode_sbd = tf.cast(decode_sbd, dtype=tf.float32)
-        #     # print(decode_sbd, codes_ed)
-        #     # print(decode_sbd.dtype,codes_ed.dtype)
-        #     diff += tf.math.square(tf.subtract(decode_sbd, codes_ed))
-        #     # codes_dist = tf.add(_sbd_tf(tf.reshape(codes[idx1], [-1]), tf.reshape(codes[idx2], [-1])), codes_dist)
-        #     # codes_dist.append(_sbd_tf(codes[idx1], codes[idx2]))
-        #     # true_dist = tf.add( _sbd_tf(tf.reshape(inputs[idx1], [-1]), tf.reshape(inputs[idx2], [-1])), true_dist)
-        #     # true_dist.append(_sbd_tf(tf.reshape(inputs[idx1], [-1]), tf.reshape(inputs[idx2], [-1])))
-        #
-        # # dist_mae = mean_absolute_error(codes_dist, true_dist)
-        # # dist_mse = mean_squared_error(codes_dist, true_dist)
-        # # return tf.math.square(codes_dist-true_dist)
-        d2r = tf.reshape(d2,[-1])
-        # l =  tf.keras.losses.MSE(tf.reshape(sbd_distances, [-1]), tf.reshape(d2, [-1]))
-        # apprx_dist = np.linalg.norm(c1 - c2, axis=1)
-        # sbd_distances = tf.cast(sbd_distances, tf.float32)
-        # t = tf.math.reduce_sum(tf.clip_by_value(tf.math.square(tf.subtract(tf.reshape(sbd_distances, [-1]), d2r) / 2),1e-10,1.0)) / len(idx_combination)
-        t = tf.math.reduce_sum(
-            tf.clip_by_value(tf.math.square((tf.reshape(sbd_distances, [-1]) - d2r) / 2) , 1e-11, 1.0)
-        ) / len(d2r) / 2
-        # loss_out = l(sbd_distances, tf.reshape(d2,[-1]))
-        # l2 = _similarity_loss(tf.reshape(sbd_distances, [-1]), tf.reshape(d2, [-1]))
-        return t
+        nt = tf.math.reduce_sum(tf.math.square(without_diagonal)) / combination_length
+
+        return nt
 
 
 # @tf.function
@@ -619,14 +571,14 @@ def train_step(inputs, auto_encoder, optimizer=_optimizer, loss=_mse_loss, ld=0.
         # print(similarity_loss)
         print("reconstruction loss: ", loss, " ", "similarity_loss: ", similarity_loss)
 
-        total_loss = loss + ld * similarity_loss
+        total_loss = (1-ld) * loss + ld * similarity_loss
         # total_loss = loss + (1e-1) * similarity_loss
         # total_loss = similarity_loss # use this line to check if similarity loss correctly implemented
         trainables = auto_encoder.encode.trainable_variables + auto_encoder.decode.trainable_variables
         # total_loss = tf.convert_to_tensor(0)
     gradients = tape.gradient(total_loss, trainables)
     optimizer.apply_gradients(zip(gradients, trainables))
-    return total_loss
+    return total_loss, loss, similarity_loss
 
 
 def main():
