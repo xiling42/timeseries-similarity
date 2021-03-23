@@ -90,8 +90,8 @@ ae = AutoEncoder(**kwargs)
 
 # %%
 
-EPOCHS = 200
-BATCH = 10
+EPOCHS = 100
+BATCH = 20
 SHUFFLE_BUFFER = 100
 K = len(set(y_train))
 
@@ -103,12 +103,13 @@ train_dataset = train_dataset.shuffle(SHUFFLE_BUFFER).batch(BATCH)
 
 loss_history = []
 similarity_history, reconstruction_history = [], []
+similarity_loss_percentage = 0.01
 
 for epoch in range(EPOCHS):
     total_loss = 0
     total_similarity, total_reconstruction = 0, 0
     for i, (input, _) in enumerate(train_dataset):
-        loss, similarity_loss, reconstruction_loss = train_step(input, ae, ld =0.01) # 0 not use similarity
+        loss, reconstruction_loss, similarity_loss = train_step(input, ae, ld =similarity_loss_percentage) # 0 not use similarity
         total_loss += loss
 
     loss_history.append(total_loss)
@@ -117,8 +118,28 @@ for epoch in range(EPOCHS):
     # print("Epoch {}: {}".format(epoch, total_loss), end="\r")
     print("Epoch {}: {}".format(epoch, total_loss))
 
-plt.subplot(1,2,1)
-plt.plot(loss_history, similarity_history, reconstruction_history)
+fig, axs = plt.subplots(2, 2)
+axs[0, 0].plot(loss_history, 'b')
+axs[0, 0].set_title('total loss')
+axs[1, 0].plot(similarity_history, 'g')
+axs[1, 0].set_title('similarity loss')
+axs[1, 1].plot(reconstruction_history, 'r')
+axs[1, 1].set_title('reconstruction loss')
+
+
+print('epochs: ', EPOCHS)
+print('batch: ', BATCH)
+print('similarity loss percentage: ', similarity_loss_percentage)
+# plt.subplot(1,2,1)
+# t = [loss_history, similarity_history]
+# plt.plot(t)
+
+# plt.plot(loss_history, 'b')
+
+# plt.subplot(2,2,1)
+# plt.plot(similarity_history, 'g')
+# plt.subplot(2,2,2)
+# plt.plot(reconstruction_history, 'r')
 
 
 # %%
@@ -156,9 +177,11 @@ X_train[0].shape
 code_test = ae.encode(X_test)
 decoded_test = ae.decode(code_test)
 
-plt.subplot(1,2,2)
-plt.plot(X_test[0])
-plt.plot(decoded_test[0])
+# plt.subplot(1,2,2)
+axs[0, 1].plot(X_test[0])
+axs[0, 1].plot(decoded_test[0])
+# plt.plot(X_test[0])
+# plt.plot(decoded_test[0])
 plt.show()
 
 losses = []
