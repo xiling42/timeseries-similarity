@@ -15,7 +15,7 @@ X_train, y_train, X_test, y_test, info = py_ts_data.load_data("GunPoint", variab
 print("Dataset shape: Train: {}, Test: {}".format(X_train.shape, X_test.shape))
 
 
-def augmentation(x, y, lower_bond = -0.01, upper_bond = 0.01, limits = 2000):
+def augmentation(x, y, lower_bond = -0.005, upper_bond = 0.005, limits = 2000):
     size = x.shape
 
     if size[0] > limits: # limits is data augmentation limits
@@ -90,7 +90,7 @@ ae = AutoEncoder(**kwargs)
 
 # %%
 
-EPOCHS = 100
+EPOCHS = 200
 BATCH = 20
 SHUFFLE_BUFFER = 100
 K = len(set(y_train))
@@ -106,7 +106,7 @@ loss_history = []
 for epoch in range(EPOCHS):
     total_loss = 0
     for i, (input, _) in enumerate(train_dataset):
-        loss = train_step(input, ae, ld = 0.5) # 0 not use similarity
+        loss = train_step(input, ae, ld =1) # 0 not use similarity
         total_loss += loss
     loss_history.append(total_loss)
     # print("Epoch {}: {}".format(epoch, total_loss), end="\r")
