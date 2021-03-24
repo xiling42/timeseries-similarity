@@ -6,7 +6,7 @@ import py_ts_data
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
-
+from sklearn.neighbors import NearestNeighbors
 
 import datetime
 from auto_encoder import AutoEncoder, train_step
@@ -60,6 +60,33 @@ def normalize(data):
     return (data - means ) /stddev
 
 
+def evaluate_similarity(X_test, code_test):
+    def nn_dist(x, y):
+        """
+        Sample distance metric, here, using only Euclidean distance
+        """
+        x = x.reshape((45, 2))
+        y = y.reshape((45, 2))
+        return np.linalg.norm(x - y)
+
+    nn_x_test = X_test.reshape((-1, 90))
+    baseline_nn = NearestNeighbors(n_neighbors=10, metric=nn_dist).fit(nn_x_test)
+    code_nn = NearestNeighbors(n_neighbors=10).fit(code_test)
+
+    # For each item in the test data, find its 11 nearest neighbors in that dataset (the nn is itself)
+    baseline_11nn = baseline_nn.kneighbors(nn_x_test, 11, return_distance=False)
+    code_11nn = code_nn.kneighbors(code_test, 11, return_distance=False)
+
+    # On average, how many common items are in the 10nn?
+    result = []
+    for b, c in zip(baseline_11nn, code_11nn):
+        # remove the first nn (itself)
+        b = set(b[1:])
+        c = set(c[1:])
+        result.append(len(b.intersection(c)))
+    print('common items: ', np.array(result).mean())
+
+
 # %%
 
 # fig, axs = plt.subplots(1, 2, figsize=(10, 3))
@@ -90,8 +117,8 @@ ae = AutoEncoder(**kwargs)
 
 # %%
 
-EPOCHS = 100
-BATCH = 50
+EPOCHS = 75
+BATCH = 30
 SHUFFLE_BUFFER = 100
 K = len(set(y_train))
 
@@ -103,7 +130,7 @@ train_dataset = train_dataset.shuffle(SHUFFLE_BUFFER).batch(BATCH)
 
 loss_history = []
 similarity_history, reconstruction_history = [], []
-similarity_loss_percentage = 1
+similarity_loss_percentage = 0.1
 
 for epoch in range(EPOCHS):
     total_loss = 0
@@ -111,12 +138,17 @@ for epoch in range(EPOCHS):
     for i, (input, _) in enumerate(train_dataset):
         loss, reconstruction_loss, similarity_loss = train_step(input, ae, ld =similarity_loss_percentage) # 0 not use similarity
         total_loss += loss
+        total_similarity += similarity_loss
+        total_reconstruction += reconstruction_loss
 
     loss_history.append(total_loss)
-    similarity_history.append(similarity_loss)
-    reconstruction_history.append(reconstruction_loss)
+    similarity_history.append(total_similarity)
+    reconstruction_history.append(total_reconstruction)
     # print("Epoch {}: {}".format(epoch, total_loss), end="\r")
     print("Epoch {}: {}".format(epoch, total_loss))
+    if epoch % 10 == 0:
+        # every 50 epoch
+        evaluate_similarity(X_test, ae.encode(X_test))
 
 fig, axs = plt.subplots(2, 2)
 axs[0, 0].plot(loss_history, 'b')
@@ -195,32 +227,9 @@ print("Mean L2 distance: {}".format(np.array(losses).mean()))
 
 # %%
 
-from sklearn.neighbors import NearestNeighbors
 
-def nn_dist(x, y):
-    """
-    Sample distance metric, here, using only Euclidean distance
-    """
-    x = x.reshape((45, 2))
-    y = y.reshape((45, 2))
-    return np.linalg.norm( x -y)
 
-nn_x_test = X_test.reshape((-1, 90))
-baseline_nn = NearestNeighbors(n_neighbors=10, metric=nn_dist).fit(nn_x_test)
-code_nn = NearestNeighbors(n_neighbors=10).fit(code_test)
 
-# For each item in the test data, find its 11 nearest neighbors in that dataset (the nn is itself)
-baseline_11nn = baseline_nn.kneighbors(nn_x_test, 11, return_distance=False)
-code_11nn     = code_nn.kneighbors(code_test, 11, return_distance=False)
-
-# On average, how many common items are in the 10nn?
-result = []
-for b, c in zip(baseline_11nn, code_11nn):
-    # remove the first nn (itself)
-    b = set(b[1:])
-    c = set(c[1:])
-    result.append(len(b.intersection(c)))
-print('common items: ', np.array(result).mean())
 
 # %%
-
+evaluate_similarity(X_test, code_test)

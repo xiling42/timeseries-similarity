@@ -574,7 +574,7 @@ def train_step(inputs, auto_encoder, optimizer=_optimizer, loss=_mse_loss, ld=0.
 
         # print('loss')
         # print(similarity_loss)
-        print("reconstruction loss: ", loss, " ", "similarity_loss: ", similarity_loss)
+        # print("reconstruction loss: ", loss, " ", "similarity_loss: ", similarity_loss)
 
         total_loss = (1-ld) * loss + ld * similarity_loss
         # total_loss = loss + (1e-1) * similarity_loss
