@@ -544,12 +544,16 @@ class AutoEncoder:
         sbd_reshape = tf.reshape(sbd_distances, (len(codes), -1))
 
         d2 = euclidean(tf.reshape(codes, (codes.shape[0], -1)), tf.reshape(codes, (codes.shape[0], -1)), True)
+        d2 = d2 + 1.0e-12
 
         with_diagonal = tf.linalg.band_part(sbd_reshape - d2, -1, 0)
         without_diagonal = tf.linalg.set_diag(with_diagonal, [0 for i in range(len(codes))])
 
-        nt = tf.math.reduce_sum(tf.math.square(without_diagonal)) / combination_length
+        nsq = tf.math.square(without_diagonal)
+        # nclip = tf.clip_by_value(nsq, 1e-10, 100)
+        nt = tf.math.reduce_sum(nsq) / combination_length
 
+        # nt = tf.math.reduce_sum(tf.math.square(without_diagonal)) / combination_length
         return nt
 
 
@@ -558,14 +562,15 @@ def train_step(inputs, auto_encoder, optimizer=_optimizer, loss=_mse_loss, ld=0.
     # print('---')
 
     with tf.GradientTape() as tape:
-
+        inputs = tf.cast(inputs, tf.float32)
         codes = auto_encoder.encode(inputs, training=True)
         decodes = auto_encoder.decode(codes, training=True)
-        loss = loss(inputs, decodes)
+        loss = loss(inputs, decodes) if ld != 1 else 0
         if ld == 0:
             similarity_loss = 0
         else:
-            similarity_loss = auto_encoder.similarity_loss(codes, decodes)
+            similarity_loss = auto_encoder.similarity_loss(codes, inputs)
+
 
         # print('loss')
         # print(similarity_loss)

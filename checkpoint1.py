@@ -91,7 +91,7 @@ ae = AutoEncoder(**kwargs)
 # %%
 
 EPOCHS = 100
-BATCH = 20
+BATCH = 50
 SHUFFLE_BUFFER = 100
 K = len(set(y_train))
 
@@ -103,7 +103,7 @@ train_dataset = train_dataset.shuffle(SHUFFLE_BUFFER).batch(BATCH)
 
 loss_history = []
 similarity_history, reconstruction_history = [], []
-similarity_loss_percentage = 0.01
+similarity_loss_percentage = 1
 
 for epoch in range(EPOCHS):
     total_loss = 0
