@@ -9,13 +9,14 @@ import matplotlib.pyplot as plt
 from sklearn.neighbors import NearestNeighbors
 
 import datetime
-from auto_encoder import AutoEncoder, train_step
+from auto_encoder import AutoEncoder, train_step, train_step_v2, Encoder
 
-X_train, y_train, X_test, y_test, info = py_ts_data.load_data("GunPoint", variables_as_channels=True)
+dataset_name = 'TwoPatterns'
+X_train, y_train, X_test, y_test, info = py_ts_data.load_data(dataset_name, variables_as_channels=True)
 print("Dataset shape: Train: {}, Test: {}".format(X_train.shape, X_test.shape))
 
 
-def augmentation(x, y, lower_bond = -0.005, upper_bond = 0.005, limits = 2000):
+def augmentation(x, y, lower_bond = -0.01, upper_bond = 0.01, limits = 1600):
     size = x.shape
 
     if size[0] > limits: # limits is data augmentation limits
@@ -65,11 +66,11 @@ def evaluate_similarity(X_test, code_test):
         """
         Sample distance metric, here, using only Euclidean distance
         """
-        x = x.reshape((45, 2))
-        y = y.reshape((45, 2))
+        x = x.reshape((40, 2))
+        y = y.reshape((40, 2))
         return np.linalg.norm(x - y)
 
-    nn_x_test = X_test.reshape((-1, 90))
+    nn_x_test = X_test.reshape((-1, 80))
     baseline_nn = NearestNeighbors(n_neighbors=10, metric=nn_dist).fit(nn_x_test)
     code_nn = NearestNeighbors(n_neighbors=10).fit(code_test)
 
@@ -104,22 +105,27 @@ def evaluate_similarity(X_test, code_test):
 
 kwargs = {
     "input_shape": (X_train.shape[1], X_train.shape[2]),
-    "filters": [32, 64, 128],
+    "filters": [64, 32, 16],
     "kernel_sizes": [5, 5, 5],
     "code_size": 16,
 }
+input_shape = kwargs["input_shape"]
+code_size = kwargs["code_size"]
+filters = kwargs["filters"]
+kernel_sizes = kwargs["kernel_sizes"]
 
 ae = AutoEncoder(**kwargs)
-
+similarity_encoder = Encoder(input_shape, code_size, filters, kernel_sizes)
 # %% md
 
 # Training
 
 # %%
 
-EPOCHS = 75
-BATCH = 30
+EPOCHS = 200
+BATCH = 20
 SHUFFLE_BUFFER = 100
+similarity_loss_percentage = 0.01
 K = len(set(y_train))
 
 
@@ -130,13 +136,17 @@ train_dataset = train_dataset.shuffle(SHUFFLE_BUFFER).batch(BATCH)
 
 loss_history = []
 similarity_history, reconstruction_history = [], []
-similarity_loss_percentage = 0.1
+
 
 for epoch in range(EPOCHS):
     total_loss = 0
     total_similarity, total_reconstruction = 0, 0
+    if epoch % 10 == 0:
+        # every 50 epoch
+        evaluate_similarity(X_test, ae.encode(X_test))
+
     for i, (input, _) in enumerate(train_dataset):
-        loss, reconstruction_loss, similarity_loss = train_step(input, ae, ld =similarity_loss_percentage) # 0 not use similarity
+        loss, reconstruction_loss, similarity_loss = train_step_v2(input, ae, similarity_encoder, ld =similarity_loss_percentage) # 0 not use similarity
         total_loss += loss
         total_similarity += similarity_loss
         total_reconstruction += reconstruction_loss
@@ -146,9 +156,7 @@ for epoch in range(EPOCHS):
     reconstruction_history.append(total_reconstruction)
     # print("Epoch {}: {}".format(epoch, total_loss), end="\r")
     print("Epoch {}: {}".format(epoch, total_loss))
-    if epoch % 10 == 0:
-        # every 50 epoch
-        evaluate_similarity(X_test, ae.encode(X_test))
+
 
 fig, axs = plt.subplots(2, 2)
 axs[0, 0].plot(loss_history, 'b')
@@ -158,7 +166,7 @@ axs[1, 0].set_title('similarity loss')
 axs[1, 1].plot(reconstruction_history, 'r')
 axs[1, 1].set_title('reconstruction loss')
 
-
+print('dataset: ', dataset_name)
 print('epochs: ', EPOCHS)
 print('batch: ', BATCH)
 print('similarity loss percentage: ', similarity_loss_percentage)
@@ -212,6 +220,7 @@ decoded_test = ae.decode(code_test)
 # plt.subplot(1,2,2)
 axs[0, 1].plot(X_test[0])
 axs[0, 1].plot(decoded_test[0])
+axs[1, 1].set_title('reconstruction example')
 # plt.plot(X_test[0])
 # plt.plot(decoded_test[0])
 plt.show()
