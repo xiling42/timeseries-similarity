@@ -54,6 +54,27 @@ class Encoder(tf.keras.Model):
         # print(x.shape)
         return x
 
+    def similarity_loss(self, codes, decodes):
+
+        combination_length = (len(codes) * len(codes) - len(codes)) / 2
+
+        sbd_distances = _sbd_tf_2d(tf.reshape(decodes, (decodes.shape[0], -1)),
+                                   tf.reshape(decodes, (decodes.shape[0], -1)))
+        sbd_reshape = tf.reshape(sbd_distances, (len(codes), -1))
+
+        d2 = euclidean(tf.reshape(codes, (codes.shape[0], -1)), tf.reshape(codes, (codes.shape[0], -1)), True)
+        d2 = d2 + 1.0e-12
+
+        with_diagonal = tf.linalg.band_part(sbd_reshape - d2, -1, 0)
+        without_diagonal = tf.linalg.set_diag(with_diagonal, [0 for i in range(len(codes))])
+
+        nsq = tf.math.square(without_diagonal)
+        # nclip = tf.clip_by_value(nsq, 1e-10, 100)
+        nt = tf.math.reduce_sum(nsq) / combination_length
+
+        # nt = tf.math.reduce_sum(tf.math.square(without_diagonal)) / combination_length
+        return nt
+
 
 class Decoder(tf.keras.Model):
 
@@ -94,6 +115,7 @@ class Decoder(tf.keras.Model):
 
 
 _optimizer = tf.keras.optimizers.Nadam(learning_rate=0.00015)
+_similarity_optimizer = tf.keras.optimizers.Nadam(learning_rate=0.00015)
 _mse_loss = tf.keras.losses.MeanSquaredError()
 _similarity_loss = tf.keras.losses.MeanSquaredError()
 
@@ -493,6 +515,7 @@ class AutoEncoder:
 
         self.loss = loss
         self.optimizer = optimizer
+        self.optimizer_similarity = tf.keras.optimizers.Nadam(learning_rate=0.00015)
 
     # def similarity_loss(self, codes, decodes):
     #     # batchs size * timestamp size * variable size  ?? flatten?
@@ -570,7 +593,7 @@ def train_step_v2(inputs, auto_encoder, encoder, optimizer=_optimizer, loss=_mse
         if ld == 0:
             similarity_loss = 0
         else:
-            similarity_loss = auto_encoder.similarity_loss(codes_similarity, inputs)
+            similarity_loss = encoder.similarity_loss(codes_similarity, inputs)
 
 
         # print('loss')
@@ -611,6 +634,39 @@ def train_step(inputs, auto_encoder, optimizer=_optimizer, loss=_mse_loss, ld=0.
         # total_loss = tf.convert_to_tensor(0)
     gradients = tape.gradient(total_loss, trainables)
     optimizer.apply_gradients(zip(gradients, trainables))
+    return total_loss, loss, similarity_loss
+
+
+def train_step_v3(inputs, auto_encoder, encoder, optimizer=_optimizer, loss=_mse_loss, ld=0.5):
+    # print('---')
+
+    with tf.GradientTape() as tape, tf.GradientTape() as similarity_tape:
+        inputs = tf.cast(inputs, tf.float32)
+        codes_similarity = encoder(inputs, training=True)
+        codes_reconstruction = auto_encoder.encode(inputs, training=True)
+        decodes = auto_encoder.decode(codes_reconstruction, training=True)
+        loss = loss(inputs, decodes) if ld != 1 else 0
+        if ld == 0:
+            similarity_loss = 0
+        else:
+            similarity_loss = encoder.similarity_loss(codes_similarity, inputs)
+
+
+        # print('loss')
+        # print(similarity_loss)
+        # print("reconstruction loss: ", loss, " ", "similarity_loss: ", similarity_loss)
+
+        total_loss = (1-ld) * loss + ld * similarity_loss
+        # total_loss = loss + (1e-1) * similarity_loss
+        # total_loss = similarity_loss # use this line to check if similarity loss correctly implemented
+        trainables = auto_encoder.encode.trainable_variables + auto_encoder.decode.trainable_variables
+        similarity_trainables = encoder.trainable_variables
+        # total_loss = tf.convert_to_tensor(0)
+    gradients = tape.gradient(total_loss, trainables)
+    optimizer.apply_gradients(zip(gradients, trainables))
+
+    similarity_gradients = similarity_tape.gradient(similarity_loss, similarity_trainables)
+    _similarity_optimizer.apply_gradients(zip(similarity_gradients, similarity_trainables))
     return total_loss, loss, similarity_loss
 
 

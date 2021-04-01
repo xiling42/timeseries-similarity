@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from sklearn.neighbors import NearestNeighbors
 
 import datetime
-from auto_encoder import AutoEncoder, train_step, train_step_v2, Encoder
+from auto_encoder import AutoEncoder, train_step, train_step_v2, Encoder, train_step_v3
 
 dataset_name = 'TwoPatterns'
 X_train, y_train, X_test, y_test, info = py_ts_data.load_data(dataset_name, variables_as_channels=True)
@@ -146,7 +146,7 @@ for epoch in range(EPOCHS):
         evaluate_similarity(X_test, ae.encode(X_test))
 
     for i, (input, _) in enumerate(train_dataset):
-        loss, reconstruction_loss, similarity_loss = train_step_v2(input, ae, similarity_encoder, ld =similarity_loss_percentage) # 0 not use similarity
+        loss, reconstruction_loss, similarity_loss = train_step_v3(input, ae, similarity_encoder, ld =similarity_loss_percentage) # 0 not use similarity
         total_loss += loss
         total_similarity += similarity_loss
         total_reconstruction += reconstruction_loss
