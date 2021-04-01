@@ -123,9 +123,9 @@ similarity_encoder = Encoder(input_shape, code_size, filters, kernel_sizes)
 # %%
 
 EPOCHS = 200
-BATCH = 20
+BATCH = 50
 SHUFFLE_BUFFER = 100
-similarity_loss_percentage = 0.01
+similarity_loss_percentage = 0.1
 K = len(set(y_train))
 
 
