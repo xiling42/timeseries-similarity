@@ -109,7 +109,7 @@ class Decoder(tf.keras.Model):
         for conv, norm in zip(self.convs, self.norms):
             x = norm(x, training=training)
             x = conv(x)
-        assert self.expected_output_shape == x.shape[1:]
+        # assert self.expected_output_shape == x.shape[1:]
         # print(x.shape)
         return x
 
@@ -506,6 +506,7 @@ class AutoEncoder:
 
         self.encode = Encoder(input_shape, code_size, filters, kernel_sizes)
 
+        # filters = filters[::-1]
         decoder_filters = list(filters[:len(filters) - 1])
         decoder_filters.append(input_shape[1])
         last_kernel_shape = self.encode.last_kernel_shape

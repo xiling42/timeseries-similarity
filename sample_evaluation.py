@@ -18,7 +18,7 @@ import evaluation
 
 PARSER = argparse.ArgumentParser()
 PARSER.add_argument('-d', '--dataset', default="GunPoint", required=False, help="dataset to run")
-PARSER.add_argument('-m', '--models', default="sample_model", required=False, help="dataset to run")
+PARSER.add_argument('-m', '--models', default="QZ", required=False, help="dataset to run")
 ARGS = PARSER.parse_args()
 
 DATA = ARGS.dataset
@@ -67,6 +67,17 @@ def distance_timeseries(x, y):
 def clustering(x):
     assert len(x.shape) == 2
     return CLUSTERING.predict(x)
+
+def evaluate():
+
+    recon = evaluation.evaluate_reconstruction(X_TEST, encoder, decoder)
+    dist = evaluation.evaluate_distance(X_TEST, encoder, distance_collection)
+    common = evaluation.evaluate_common_nn(X_TRAIN, X_TEST, encoder, distance_timeseries, N_NEIGHBORS)
+    ri = evaluation.evaluate_clustering_ri(X_TRAIN, X_TEST, encoder, clustering, N_CLUSTERS)
+    print(
+        "{}, reconstruction: {:.3f}, distance mse: {:.3f}, distance mae: {:.3f}, common nn: {:.3f}, rand index: {:.3f}".format(
+            DATA, recon, dist[0], dist[1], common, ri))
+
 
 if __name__ == "__main__":
 

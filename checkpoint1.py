@@ -8,10 +8,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.neighbors import NearestNeighbors
 
+
 import datetime
 from auto_encoder import AutoEncoder, train_step, train_step_v2, Encoder, train_step_v3
 
-dataset_name = 'TwoPatterns'
+dataset_name = 'GunPoint'
 X_train, y_train, X_test, y_test, info = py_ts_data.load_data(dataset_name, variables_as_channels=True)
 print("Dataset shape: Train: {}, Test: {}".format(X_train.shape, X_test.shape))
 
@@ -66,11 +67,11 @@ def evaluate_similarity(X_test, code_test):
         """
         Sample distance metric, here, using only Euclidean distance
         """
-        x = x.reshape((40, 2))
-        y = y.reshape((40, 2))
+        x = x.reshape((45, 2))
+        y = y.reshape((45, 2))
         return np.linalg.norm(x - y)
 
-    nn_x_test = X_test.reshape((-1, 80))
+    nn_x_test = X_test.reshape((-1, 90))
     baseline_nn = NearestNeighbors(n_neighbors=10, metric=nn_dist).fit(nn_x_test)
     code_nn = NearestNeighbors(n_neighbors=10).fit(code_test)
 
@@ -122,10 +123,10 @@ similarity_encoder = Encoder(input_shape, code_size, filters, kernel_sizes)
 
 # %%
 
-EPOCHS = 200
+EPOCHS = 100
 BATCH = 50
 SHUFFLE_BUFFER = 100
-similarity_loss_percentage = 0.1
+similarity_loss_percentage = 0.01
 K = len(set(y_train))
 
 
@@ -240,5 +241,14 @@ print("Mean L2 distance: {}".format(np.array(losses).mean()))
 
 
 
+
 # %%
 evaluate_similarity(X_test, code_test)
+
+# tf.saved_model.save(ae.decode, '/tmp/adder')
+
+ae.encode.save(r'C:\Users\Ling\OneDrive\Documents\Brown-DESKTOP-8B9G99R\Timeseries-database\\timeseries-similarity\QZ\GunPoint\encoder')
+ae.decode.save(r'C:\Users\Ling\OneDrive\Documents\Brown-DESKTOP-8B9G99R\Timeseries-database\\timeseries-similarity\QZ\GunPoint\decoder')
+
+from sample_evaluation import evaluate
+evaluate()
