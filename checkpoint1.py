@@ -7,16 +7,18 @@ import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.neighbors import NearestNeighbors
+import random
 
 
 import datetime
-from auto_encoder import AutoEncoder, train_step, train_step_v2, Encoder, train_step_v3
+from auto_encoder import AutoEncoder, train_step, train_step_v2, Encoder, train_step_v3, _sbd_tf
 
 dataset_name = 'GunPoint'
 X_train, y_train, X_test, y_test, info = py_ts_data.load_data(dataset_name, variables_as_channels=True)
 print("Dataset shape: Train: {}, Test: {}".format(X_train.shape, X_test.shape))
 
-
+# print(X_train[0])
+# print(y_train[0])
 def augmentation(x, y, lower_bond = -0.01, upper_bond = 0.01, limits = 1600):
     size = x.shape
 
@@ -31,7 +33,73 @@ def augmentation(x, y, lower_bond = -0.01, upper_bond = 0.01, limits = 1600):
 
     x = np.concatenate(new_x, axis=0)
     y = np.concatenate(new_y, axis =0)
+    
     return x, y
+
+def shift_invariance(x, y, upper_bond = 20):
+    size = x.shape
+    # print(x.shape)
+    new_x = []
+    new_y = []
+    for i in range(size[0]):
+        temp = x[i].flatten()
+        # print(temp)
+        shift_left(temp, random.randint(0, upper_bond))
+        temp = temp.reshape((size[1], 1))
+        new_x.append(temp)
+        new_y.append(y[i])
+
+    # x = np.concatenate(new_x, axis=0)
+    # y = np.concatenate(new_y, axis =0)
+    
+    return np.asarray(new_x), np.asarray(new_y)
+
+def shift_left_once(lst):
+    temp = lst[0]
+    for index in range(len(lst) - 1):
+        lst[index] = lst[index + 1]         
+    lst[index + 1] = temp
+
+def shift_left(lst, n):
+    """Shifts the lst over by n indices
+
+    >>> lst = [1, 2, 3, 4, 5]
+    >>> shift_left(lst, 2)
+    >>> lst
+    [3, 4, 5, 1, 2]
+    """
+    assert (n >= 0), "n should be non-negative integer"
+    for _ in range(n):
+        shift_left_once(lst)
+
+x, y = shift_invariance(X_train[:10,:,:], y_train[:10])
+# print(x, "  ", y)
+lst = [1, 2, 3, 4, 5]
+shift_left(lst, 2)
+# print(np.asarray(lst)*2)
+
+def scale_invariance(x, y, upper_bond = 5):
+    size = x.shape
+    # print(x.shape)
+    new_x = []
+    new_y = []
+    for i in range(size[0]):
+        temp = x[i].flatten()
+        # print(temp)
+        # shift_left(temp, random.randint(0, upper_bond))
+        temp = np.asarray(temp) * random.randint(1, upper_bond)
+        temp = temp.reshape((size[1], 1))
+        new_x.append(temp)
+        new_y.append(y[i])
+
+    # x = np.concatenate(new_x, axis=0)
+    # y = np.concatenate(new_y, axis =0)
+    
+    return np.asarray(new_x), np.asarray(new_y)
+
+x, y = scale_invariance(X_train[:10,:,:], y_train[:10])
+# print(x, "  ", y)
+
 
 # %%
 
@@ -67,11 +135,11 @@ def evaluate_similarity(X_test, code_test):
         """
         Sample distance metric, here, using only Euclidean distance
         """
-        x = x.reshape((45, 2))
-        y = y.reshape((45, 2))
+        x = x.reshape((150, 1))
+        y = y.reshape((150, 1))
         return np.linalg.norm(x - y)
 
-    nn_x_test = X_test.reshape((-1, 90))
+    nn_x_test = X_test.reshape((-1, 150))
     baseline_nn = NearestNeighbors(n_neighbors=10, metric=nn_dist).fit(nn_x_test)
     code_nn = NearestNeighbors(n_neighbors=10).fit(code_test)
 
@@ -123,14 +191,20 @@ similarity_encoder = Encoder(input_shape, code_size, filters, kernel_sizes)
 
 # %%
 
-EPOCHS = 100
+EPOCHS = 150
 BATCH = 50
 SHUFFLE_BUFFER = 100
 similarity_loss_percentage = 0.01
 K = len(set(y_train))
 
-
+# print(X_train.shape, " ", y_train.shape)
+# X_train, y_train = shift_invariance(X_train, y_train)
+# X_train, y_train = scale_invariance(X_train, y_train)
+# print(np.asarray(x).shape, " ", np.asarray(y).shape)
+# print(X_train.shape, " ", y_train.shape)
 X_train, y_train = augmentation(X_train, y_train)
+# print(X_train.shape, " ", y_train.shape)
+
 
 train_dataset = tf.data.Dataset.from_tensor_slices((X_train, y_train))
 train_dataset = train_dataset.shuffle(SHUFFLE_BUFFER).batch(BATCH)
@@ -147,7 +221,7 @@ for epoch in range(EPOCHS):
         evaluate_similarity(X_test, ae.encode(X_test))
 
     for i, (input, _) in enumerate(train_dataset):
-        loss, reconstruction_loss, similarity_loss = train_step_v3(input, ae, similarity_encoder, ld =similarity_loss_percentage) # 0 not use similarity
+        loss, reconstruction_loss, similarity_loss = train_step_v3(input, ae, similarity_encoder, ld =similarity_loss_percentage, sbd = True) # 0 not use similarity
         total_loss += loss
         total_similarity += similarity_loss
         total_reconstruction += reconstruction_loss
@@ -247,8 +321,9 @@ evaluate_similarity(X_test, code_test)
 
 # tf.saved_model.save(ae.decode, '/tmp/adder')
 
-ae.encode.save(r'C:\Users\Ling\OneDrive\Documents\Brown-DESKTOP-8B9G99R\Timeseries-database\\timeseries-similarity\QZ\GunPoint\encoder')
-ae.decode.save(r'C:\Users\Ling\OneDrive\Documents\Brown-DESKTOP-8B9G99R\Timeseries-database\\timeseries-similarity\QZ\GunPoint\decoder')
+ae.encode.save(r'/Users/Lunalu/Desktop/TSDB/project/timeseries-similarity/QZ/GunPoint/encoder')
+ae.decode.save(r'/Users/Lunalu/Desktop/TSDB/project/timeseries-similarity/QZ/GunPoint/decoder')
+similarity_encoder.save(r'/Users/Lunalu/Desktop/TSDB/project/timeseries-similarity/QZ/GunPoint/similarity_encoder')
 
 from sample_evaluation import evaluate
 evaluate()

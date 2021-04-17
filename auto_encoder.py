@@ -12,6 +12,8 @@ from sklearn.metrics import adjusted_rand_score, mean_squared_error, mean_absolu
 
 import tensorflow as tf
 
+import matplotlib.pyplot as plt
+
 
 class Encoder(tf.keras.Model):
 
@@ -54,19 +56,24 @@ class Encoder(tf.keras.Model):
         # print(x.shape)
         return x
 
-    def similarity_loss(self, codes, decodes):
+    def similarity_loss(self, codes, decodes, sbd=True):
 
         combination_length = (len(codes) * len(codes) - len(codes)) / 2
 
-        sbd_distances = _sbd_tf_2d(tf.reshape(decodes, (decodes.shape[0], -1)),
-                                   tf.reshape(decodes, (decodes.shape[0], -1)))
-        sbd_reshape = tf.reshape(sbd_distances, (len(codes), -1))
+        if sbd:
+            sbd_distances = _sbd_tf_2d(tf.reshape(decodes, (decodes.shape[0], -1)),
+                                    tf.reshape(decodes, (decodes.shape[0], -1)))
+            sbd_reshape = tf.reshape(sbd_distances, (len(codes), -1))
+        else:
+            sbd_reshape = euclidean(tf.reshape(decodes, (decodes.shape[0], -1)), tf.reshape(decodes, (decodes.shape[0], -1)), True)
+            sbd_reshape = sbd_reshape + 1.0e-12
 
         d2 = euclidean(tf.reshape(codes, (codes.shape[0], -1)), tf.reshape(codes, (codes.shape[0], -1)), True)
         d2 = d2 + 1.0e-12
 
         with_diagonal = tf.linalg.band_part(sbd_reshape - d2, -1, 0)
         without_diagonal = tf.linalg.set_diag(with_diagonal, [0 for i in range(len(codes))])
+
 
         nsq = tf.math.square(without_diagonal)
         # nclip = tf.clip_by_value(nsq, 1e-10, 100)
@@ -251,6 +258,10 @@ def _ncc_c_3dim_tf(x, y):
     # cc = np.concatenate((cc[:,:,-(x_len-1):], cc[:,:,:x_len]), axis=2)
     cc = tf.concat((cc[:, :, -(x_len - 1):], cc[:, :, :x_len]), axis=2)
     # print("cc concatenate: ", cc)
+    # cc = tf.dtypes.cast(cc, dtype=tf.complex128)  # 64?
+    # den = tf.dtypes.cast(den, dtype='float64')  # 32?
+
+    # return tf.math.real(cc) / tf.transpose(den)[:, :, None]
     return tf.cast(tf.math.real(cc), dtype = tf.float32) / tf.transpose(den)[:, :, None]
 
 
@@ -559,13 +570,17 @@ class AutoEncoder:
     #
     #     return diff / len(idx_combination)
 
-    def similarity_loss(self, codes, decodes):
+    def similarity_loss(self, codes, decodes, sbd=True):
 
         combination_length = (len(codes) * len(codes) - len(codes)) / 2
 
-        sbd_distances = _sbd_tf_2d(tf.reshape(decodes, (decodes.shape[0], -1)),
-                                   tf.reshape(decodes, (decodes.shape[0], -1)))
-        sbd_reshape = tf.reshape(sbd_distances, (len(codes), -1))
+        if sbd:
+            sbd_distances = _sbd_tf_2d(tf.reshape(decodes, (decodes.shape[0], -1)),
+                                    tf.reshape(decodes, (decodes.shape[0], -1)))
+            sbd_reshape = tf.reshape(sbd_distances, (len(codes), -1))
+        else:
+            sbd_reshape = euclidean(tf.reshape(decodes, (decodes.shape[0], -1)), tf.reshape(decodes, (decodes.shape[0], -1)), True)
+            sbd_reshape = sbd_reshape + 1.0e-12
 
         d2 = euclidean(tf.reshape(codes, (codes.shape[0], -1)), tf.reshape(codes, (codes.shape[0], -1)), True)
         d2 = d2 + 1.0e-12
@@ -638,7 +653,7 @@ def train_step(inputs, auto_encoder, optimizer=_optimizer, loss=_mse_loss, ld=0.
     return total_loss, loss, similarity_loss
 
 
-def train_step_v3(inputs, auto_encoder, encoder, optimizer=_optimizer, loss=_mse_loss, ld=0.5):
+def train_step_v3(inputs, auto_encoder, encoder, optimizer=_optimizer, loss=_mse_loss, ld=0.5, sbd=True):
     # print('---')
 
     with tf.GradientTape() as tape, tf.GradientTape() as similarity_tape:
@@ -650,7 +665,7 @@ def train_step_v3(inputs, auto_encoder, encoder, optimizer=_optimizer, loss=_mse
         if ld == 0:
             similarity_loss = 0
         else:
-            similarity_loss = encoder.similarity_loss(codes_similarity, inputs)
+            similarity_loss = encoder.similarity_loss(codes_similarity, inputs, sbd)
 
 
         # print('loss')
@@ -670,7 +685,46 @@ def train_step_v3(inputs, auto_encoder, encoder, optimizer=_optimizer, loss=_mse
     _similarity_optimizer.apply_gradients(zip(similarity_gradients, similarity_trainables))
     return total_loss, loss, similarity_loss
 
+def plot_sbd_ed(inputs):
 
+    combination_length = (len(inputs) * len(inputs) - len(inputs)) / 2
+
+    sbd_distances = _sbd_tf_2d(tf.reshape(inputs, (inputs.shape[0], -1)),
+                                    tf.reshape(inputs, (inputs.shape[0], -1)))
+    sbd_reshape = tf.reshape(sbd_distances, (len(inputs), -1))
+    
+    # sbd_distances = _sbd_tf_2d(tf.reshape(inputs, (inputs.shape[0], -1)),tf.reshape(inputs, (inputs.shape[0], -1)))
+    # sbd_reshape = tf.reshape(sbd_distances, (len(inputs), -1))
+
+    d2 = euclidean(tf.reshape(inputs, (inputs.shape[0], -1)), tf.reshape(inputs, (inputs.shape[0], -1)), True)
+    # d2 = d2 + 1.0e-12
+
+    with_diagonal_sbd = tf.linalg.band_part(sbd_reshape, -1, 0)
+    without_diagonal_sbd = tf.linalg.set_diag(with_diagonal_sbd, [0 for i in range(len(inputs))])
+    without_diagonal_sbd = tf.reshape(without_diagonal_sbd, [-1])
+    # without_diagonal_sbd = without_diagonal_sbd.numpy()
+    # without_diagonal_sbd = without_diagonal_sbd[without_diagonal_sbd != 0]
+    # print(without_diagonal_sbd, " ", len(without_diagonal_sbd))
+
+    with_diagonal_ed = tf.linalg.band_part(d2, -1, 0)
+    without_diagonal_ed = tf.linalg.set_diag(with_diagonal_ed, [0 for i in range(len(inputs))])
+    without_diagonal_ed = tf.reshape(without_diagonal_ed, [-1])
+    # print(without_diagonal_sbd.numpy())
+    # without_diagonal_ed = without_diagonal_ed.numpy()
+    # without_diagonal_ed = without_diagonal_ed[without_diagonal_ed != 0]
+    # print(without_diagonal_ed, " ", len(without_diagonal_ed))
+
+    result = []
+    for sbd, ed in zip(without_diagonal_sbd.numpy(), without_diagonal_ed.numpy()):
+        if sbd != 0 and ed != 0:
+            # temp = np.array([sbd, ed])
+            result.append([sbd, ed])
+    result = np.array(result)
+    print(result)
+    plt.scatter(result[:,0], result[:,1])
+    plt.show()
+
+    
 def main():
     x = [1, 1, 1]
     y = [1, 1, 1]
@@ -678,17 +732,19 @@ def main():
     # y = [1,2,3,4]
     import py_ts_data
 
-    X_train, y_train, X_test, y_test, info = py_ts_data.load_data("Libras", variables_as_channels=True)
+    X_train, y_train, X_test, y_test, info = py_ts_data.load_data("GunPoint", variables_as_channels=True)
     print("Dataset shape: Train: {}, Test: {}".format(X_train.shape, X_test.shape))
+    # print(np.reshape(tf.cast(X_train, tf.float32), [-1]))
+    plot_sbd_ed(np.reshape(np.append(X_train, X_test), [-1]))
 
-    print("sbd: ")
+    # print("sbd: ")
     dist = _sbd(np.reshape(X_train[0], [-1]), np.reshape(X_train[3], [-1]))
-    print("dist ", dist)
+    # print("dist ", dist)
     dist_tf = _sbd_tf(tf.reshape(X_train[0], [-1]), tf.reshape(X_train[3], [-1]))
-    print("dist tf ", dist_tf)
+    # print("dist tf ", dist_tf)
 
     idx_combination = list(it.combinations([i for i in range(10)], 2))
-    print('l idx: ', idx_combination)
+    # print('l idx: ', idx_combination)
 
 
 if __name__ == "__main__":

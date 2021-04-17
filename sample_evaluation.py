@@ -16,6 +16,8 @@ from sklearn.cluster import KMeans
 import argparse
 import evaluation
 
+from auto_encoder import _sbd_tf
+
 PARSER = argparse.ArgumentParser()
 PARSER.add_argument('-d', '--dataset', default="GunPoint", required=False, help="dataset to run")
 PARSER.add_argument('-m', '--models', default="QZ", required=False, help="dataset to run")
@@ -26,6 +28,7 @@ MODELS_PATH = ARGS.models
 
 ENCODER = tf.keras.models.load_model(os.path.join(MODELS_PATH, DATA, "encoder"))
 DECODER = tf.keras.models.load_model(os.path.join(MODELS_PATH, DATA, "decoder"))
+SIMILARITY_ENCODER = tf.keras.models.load_model(os.path.join(MODELS_PATH, DATA, "similarity_encoder"))
 X_TRAIN, Y_TRAIN, X_TEST, Y_TEST, _ = py_ts_data.load_data(DATA, variables_as_channels=True)
 # all are read in with 3 dims, last is num of variables in the TS
 assert len(X_TRAIN.shape) == 3
@@ -42,6 +45,12 @@ def encoder(x):
     assert len(x.shape) == 2
     x = x[..., np.newaxis]
     codes = ENCODER(x)
+    return codes.numpy()
+
+def similarity_encoder(x):
+    assert len(x.shape) == 2
+    x = x[..., np.newaxis]
+    codes = SIMILARITY_ENCODER(x)
     return codes.numpy()
 
 def decoder(x):
@@ -62,7 +71,8 @@ def distance_timeseries(x, y):
     assert len(x.shape) == 1
     assert len(y.shape) == 1
     assert len(x) == len(y)
-    return np.linalg.norm(x-y)
+    # return np.linalg.norm(x-y)
+    return _sbd_tf(x, y)
 
 def clustering(x):
     assert len(x.shape) == 2
@@ -74,9 +84,17 @@ def evaluate():
     dist = evaluation.evaluate_distance(X_TEST, encoder, distance_collection)
     common = evaluation.evaluate_common_nn(X_TRAIN, X_TEST, encoder, distance_timeseries, N_NEIGHBORS)
     ri = evaluation.evaluate_clustering_ri(X_TRAIN, X_TEST, encoder, clustering, N_CLUSTERS)
+
+    dist_similarity = evaluation.evaluate_distance(X_TEST, similarity_encoder, distance_collection)
+    common_similarity = evaluation.evaluate_common_nn(X_TRAIN, X_TEST, similarity_encoder, distance_timeseries, N_NEIGHBORS)
+    ri_similarity = evaluation.evaluate_clustering_ri(X_TRAIN, X_TEST, similarity_encoder, clustering, N_CLUSTERS)
+
     print(
         "{}, reconstruction: {:.3f}, distance mse: {:.3f}, distance mae: {:.3f}, common nn: {:.3f}, rand index: {:.3f}".format(
             DATA, recon, dist[0], dist[1], common, ri))
+    print(
+        "{}, reconstruction: {:.3f}, distance mse: {:.3f}, distance mae: {:.3f}, common nn: {:.3f}, rand index: {:.3f}".format(
+            DATA, recon, dist_similarity[0], dist_similarity[1], common_similarity, ri_similarity))
 
 
 if __name__ == "__main__":
