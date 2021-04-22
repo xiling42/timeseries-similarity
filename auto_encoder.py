@@ -493,6 +493,7 @@ class AutoEncoder:
         code_size = kwargs["code_size"]
         filters = kwargs["filters"]
         kernel_sizes = kwargs["kernel_sizes"]
+        breverse = kwargs['reverse']
 
         if "loss" in kwargs:
             loss = kwargs["loss"]
@@ -506,7 +507,9 @@ class AutoEncoder:
 
         self.encode = Encoder(input_shape, code_size, filters, kernel_sizes)
 
-        # filters = filters[::-1]
+        if breverse:
+            filters = filters[::-1]
+
         decoder_filters = list(filters[:len(filters) - 1])
         decoder_filters.append(input_shape[1])
         last_kernel_shape = self.encode.last_kernel_shape

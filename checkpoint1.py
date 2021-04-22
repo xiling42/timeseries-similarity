@@ -12,7 +12,7 @@ from sklearn.neighbors import NearestNeighbors
 import datetime
 from auto_encoder import AutoEncoder, train_step, train_step_v2, Encoder, train_step_v3
 
-dataset_name = 'GunPoint'
+dataset_name = 'Earthquakes'
 X_train, y_train, X_test, y_test, info = py_ts_data.load_data(dataset_name, variables_as_channels=True)
 print("Dataset shape: Train: {}, Test: {}".format(X_train.shape, X_test.shape))
 
@@ -67,11 +67,11 @@ def evaluate_similarity(X_test, code_test):
         """
         Sample distance metric, here, using only Euclidean distance
         """
-        x = x.reshape((45, 2))
-        y = y.reshape((45, 2))
+        x = x.reshape((150,1))
+        y = y.reshape((150,1))
         return np.linalg.norm(x - y)
 
-    nn_x_test = X_test.reshape((-1, 90))
+    nn_x_test = X_test.reshape((-1, 150))
     baseline_nn = NearestNeighbors(n_neighbors=10, metric=nn_dist).fit(nn_x_test)
     code_nn = NearestNeighbors(n_neighbors=10).fit(code_test)
 
@@ -93,9 +93,9 @@ def evaluate_similarity(X_test, code_test):
 
 # fig, axs = plt.subplots(1, 2, figsize=(10, 3))
 # axs[0].plot(X_train[0])
-# X_train = min_max(X_train, feature_range=(-1, 1))
+X_train = min_max(X_train, feature_range=(-1, 1))
 # axs[1].plot(X_train[0])
-# X_test = min_max(X_test, feature_range=(-1, 1))
+X_test = min_max(X_test, feature_range=(-1, 1))
 # plt.show()
 
 # %% md
@@ -106,9 +106,10 @@ def evaluate_similarity(X_test, code_test):
 
 kwargs = {
     "input_shape": (X_train.shape[1], X_train.shape[2]),
-    "filters": [64, 32, 16],
+    "filters": [16, 32, 64],
     "kernel_sizes": [5, 5, 5],
     "code_size": 16,
+    "reverse": False
 }
 input_shape = kwargs["input_shape"]
 code_size = kwargs["code_size"]
@@ -142,12 +143,12 @@ similarity_history, reconstruction_history = [], []
 for epoch in range(EPOCHS):
     total_loss = 0
     total_similarity, total_reconstruction = 0, 0
-    if epoch % 10 == 0:
-        # every 50 epoch
-        evaluate_similarity(X_test, ae.encode(X_test))
+    # if epoch % 10 == 0:
+    #     # every 50 epoch
+    #     evaluate_similarity(X_test, ae.encode(X_test))
 
     for i, (input, _) in enumerate(train_dataset):
-        loss, reconstruction_loss, similarity_loss = train_step_v3(input, ae, similarity_encoder, ld =similarity_loss_percentage) # 0 not use similarity
+        loss, reconstruction_loss, similarity_loss = train_step(input, ae, ld =similarity_loss_percentage) # 0 not use similarity
         total_loss += loss
         total_similarity += similarity_loss
         total_reconstruction += reconstruction_loss
@@ -243,7 +244,7 @@ print("Mean L2 distance: {}".format(np.array(losses).mean()))
 
 
 # %%
-evaluate_similarity(X_test, code_test)
+# evaluate_similarity(X_test, code_test)
 
 # tf.saved_model.save(ae.decode, '/tmp/adder')
 

@@ -15,6 +15,7 @@ from sklearn.neighbors import NearestNeighbors, KNeighborsClassifier
 from sklearn.cluster import KMeans
 import argparse
 import evaluation
+from run_experiment import evaluate_similarity
 
 PARSER = argparse.ArgumentParser()
 PARSER.add_argument('-d', '--dataset', default="GunPoint", required=False, help="dataset to run")
@@ -27,6 +28,7 @@ MODELS_PATH = ARGS.models
 ENCODER = tf.keras.models.load_model(os.path.join(MODELS_PATH, DATA, "encoder"))
 DECODER = tf.keras.models.load_model(os.path.join(MODELS_PATH, DATA, "decoder"))
 X_TRAIN, Y_TRAIN, X_TEST, Y_TEST, _ = py_ts_data.load_data(DATA, variables_as_channels=True)
+x_copy_test = X_TEST
 # all are read in with 3 dims, last is num of variables in the TS
 assert len(X_TRAIN.shape) == 3
 # we care only about univariate TS
@@ -85,6 +87,8 @@ if __name__ == "__main__":
     dist = evaluation.evaluate_distance(X_TEST, encoder, distance_collection)
     common = evaluation.evaluate_common_nn(X_TRAIN, X_TEST, encoder, distance_timeseries, N_NEIGHBORS)
     ri = evaluation.evaluate_clustering_ri(X_TRAIN, X_TEST, encoder, clustering, N_CLUSTERS)
+
+    print(evaluate_similarity(X_TEST, ENCODER(X_TEST)))
     print("{}, reconstruction: {:.3f}, distance mse: {:.3f}, distance mae: {:.3f}, common nn: {:.3f}, rand index: {:.3f}".format(DATA, recon, dist[0], dist[1], common, ri))
 
 
