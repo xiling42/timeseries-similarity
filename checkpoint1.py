@@ -202,17 +202,7 @@ X_train[0].shape
 
 # %%
 
-# for ch in train_dataset:
-#     print(ch)
-#     break
 
-# %% md
-
-# Test
-
-# %% md
-
-## Evaluate reconstruction
 
 # %%
 
@@ -237,9 +227,6 @@ print("Mean L2 distance: {}".format(np.array(losses).mean()))
 ## Evaluate Similarity
 
 # %%
-
-
-
 
 
 
