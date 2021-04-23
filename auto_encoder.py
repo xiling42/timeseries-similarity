@@ -481,7 +481,6 @@ def _sbd(x, y):
     # print("ncc ", ncc, "   ", idx)
     dist = 1 - ncc[idx]
     # yshift = roll_zeropad(y, (idx + 1) - max(len(x), len(y)))
-
     # yshift_tf = roll_zeropad_tf(y, (idx + 1) - max(len(x), len(y)))
     return dist
 
@@ -521,46 +520,6 @@ class AutoEncoder:
         self.optimizer = optimizer
         self.optimizer_similarity = tf.keras.optimizers.Nadam(learning_rate=0.00015)
 
-    # def similarity_loss(self, codes, decodes):
-    #     # batchs size * timestamp size * variable size  ?? flatten?
-    #     # batch [10,x,x] -> [C10 2, x, x]
-    #
-    #     idx_combination = list(it.combinations([i for i in range(len(decodes))], 2))
-    #     # print('l idx: ', len(idx_combination))
-    #     idx_list_1, idx_list_2 = [list(c) for c in zip(*idx_combination)]
-    #     codes_dist = tf.convert_to_tensor(0.0)
-    #     true_dist = tf.convert_to_tensor(0.0)
-    #
-    #     diff = tf.convert_to_tensor(0.0)
-    #
-    #     # ed
-    #     # diff = tf.cast(l_codes-r_codes, tf.float64)
-    #     # code_distances = tf.sqrt(tf.reduce_sum(tf.square(diff), axis=1)  + 1.0e-12)
-    #
-    #     for i in range(len(idx_combination)):
-    #         idx1, idx2 = idx_combination[i]
-    #         # codes_sbd = _sbd_tf(tf.reshape(codes[idx1], [-1]), tf.reshape(codes[idx2], [-1])) # change to ED
-    #         # inputs_sbd = _sbd_tf(tf.reshape(inputs[idx1], [-1]), tf.reshape(inputs[idx2], [-1])) # change to decoder
-    #
-    #         decode_sbd = _sbd(tf.reshape(decodes[idx1], [-1]).numpy(), tf.reshape(decodes[idx2], [-1]).numpy())
-    #         ed_diff = tf.cast(tf.reshape(codes[idx1], [-1]) - tf.reshape(codes[idx2], [-1]), tf.float32)
-    #         codes_ed = tf.sqrt(tf.reduce_sum(tf.square(ed_diff), axis=0) + 1.0e-12)
-    #         # codes_sbd = _sbd_tf(tf.reshape(codes[idx1], [-1]), tf.reshape(codes[idx2], [-1]))
-    #
-    #         decode_sbd = tf.cast(decode_sbd, dtype=tf.float32)
-    #         # print(decode_sbd, codes_ed)
-    #         # print(decode_sbd.dtype,codes_ed.dtype)
-    #         diff += tf.math.square(tf.subtract(decode_sbd, codes_ed))
-    #         # codes_dist = tf.add(_sbd_tf(tf.reshape(codes[idx1], [-1]), tf.reshape(codes[idx2], [-1])), codes_dist)
-    #         # codes_dist.append(_sbd_tf(codes[idx1], codes[idx2]))
-    #         # true_dist = tf.add( _sbd_tf(tf.reshape(inputs[idx1], [-1]), tf.reshape(inputs[idx2], [-1])), true_dist)
-    #         # true_dist.append(_sbd_tf(tf.reshape(inputs[idx1], [-1]), tf.reshape(inputs[idx2], [-1])))
-    #
-    #     # dist_mae = mean_absolute_error(codes_dist, true_dist)
-    #     # dist_mse = mean_squared_error(codes_dist, true_dist)
-    #     # return tf.math.square(codes_dist-true_dist)
-    #
-    #     return diff / len(idx_combination)
 
     def similarity_loss(self, codes, decodes):
 
@@ -577,10 +536,9 @@ class AutoEncoder:
         without_diagonal = tf.linalg.set_diag(with_diagonal, [0 for i in range(len(codes))])
 
         nsq = tf.math.square(without_diagonal)
-        # nclip = tf.clip_by_value(nsq, 1e-10, 100)
+
         nt = tf.math.reduce_sum(nsq) / combination_length
 
-        # nt = tf.math.reduce_sum(tf.math.square(without_diagonal)) / combination_length
         return nt
 
 # @tf.function
@@ -608,7 +566,7 @@ def train_step_v2(inputs, auto_encoder, encoder, optimizer=_optimizer, loss=_mse
         # total_loss = loss + (1e-1) * similarity_loss
         # total_loss = similarity_loss # use this line to check if similarity loss correctly implemented
         trainables = auto_encoder.encode.trainable_variables + auto_encoder.decode.trainable_variables + encoder.trainable_variables
-        # total_loss = tf.convert_to_tensor(0)
+
     gradients = tape.gradient(total_loss, trainables)
     optimizer.apply_gradients(zip(gradients, trainables))
     return total_loss, loss, similarity_loss
@@ -677,8 +635,7 @@ def train_step_v3(inputs, auto_encoder, encoder, optimizer=_optimizer, loss=_mse
 def main():
     x = [1, 1, 1]
     y = [1, 1, 1]
-    # x = [1,2,3,4]
-    # y = [1,2,3,4]
+
     import py_ts_data
 
     X_train, y_train, X_test, y_test, info = py_ts_data.load_data("Libras", variables_as_channels=True)

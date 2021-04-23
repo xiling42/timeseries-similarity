@@ -244,6 +244,7 @@ def main():
     ran_history = [] # batch size, similarity rate, filter size
     params['epoch'] = 150
 
+    # experiments based on batch size
     # for b in [50]:
     #     params['batch'] = b
     #     for s in [0.001, 0.01, 0.1, 0.5]: # 2 encoder, similarity rate cannot be 0
@@ -256,7 +257,7 @@ def main():
     #         run_experiment_for_dataset(params)
     #         print('batch {} similarity_rate {}'.format(b, s))
 
-
+    # experiments based on similarity
     # params['epoch'] = 150
     #
     # params['batch'] = 50
@@ -273,6 +274,7 @@ def main():
     #         run_experiment_for_dataset(params)
     #     print('batch {} similarity_rate {}'.format(params['batch'], s))
 
+    # experiments based on filters
     # params['epoch'] = 101
     #
     # params['batch'] = 50
@@ -307,7 +309,7 @@ def main():
                 run_experiment_for_dataset(params)
             print('batch {} similarity_rate {}'.format(params['batch'], s))
 
-
+    # experiments based on dataset
     # params['batch'] = 50
     # params['epoch'] = 101
 
@@ -325,7 +327,4 @@ def main():
     #         run_experiment_for_dataset(params)
     #     print('batch {} similarity_rate {}'.format(params['batch'], s))
 if __name__ == "__main__":
-    # import sys
-    # import doctest
-    # sys.exit(doctest.testmod()[0])
     main()

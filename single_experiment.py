@@ -98,11 +98,7 @@ X_train = min_max(X_train, feature_range=(-1, 1))
 X_test = min_max(X_test, feature_range=(-1, 1))
 # plt.show()
 
-# %% md
 
-# Encode and Decode
-
-# %%
 
 kwargs = {
     "input_shape": (X_train.shape[1], X_train.shape[2]),
@@ -172,22 +168,7 @@ print('dataset: ', dataset_name)
 print('epochs: ', EPOCHS)
 print('batch: ', BATCH)
 print('similarity loss percentage: ', similarity_loss_percentage)
-# plt.subplot(1,2,1)
-# t = [loss_history, similarity_history]
-# plt.plot(t)
 
-# plt.plot(loss_history, 'b')
-
-# plt.subplot(2,2,1)
-# plt.plot(similarity_history, 'g')
-# plt.subplot(2,2,2)
-# plt.plot(reconstruction_history, 'r')
-
-
-# %%
-
-# ae.encode.save()
-# ae.decode.save()
 # %%
 
 X_train.shape
@@ -209,12 +190,10 @@ X_train[0].shape
 code_test = ae.encode(X_test)
 decoded_test = ae.decode(code_test)
 
-# plt.subplot(1,2,2)
 axs[0, 1].plot(X_test[0])
 axs[0, 1].plot(decoded_test[0])
 axs[1, 1].set_title('reconstruction example')
-# plt.plot(X_test[0])
-# plt.plot(decoded_test[0])
+
 plt.show()
 
 losses = []
@@ -226,14 +205,6 @@ print("Mean L2 distance: {}".format(np.array(losses).mean()))
 
 ## Evaluate Similarity
 
-# %%
-
-
-
-# %%
-# evaluate_similarity(X_test, code_test)
-
-# tf.saved_model.save(ae.decode, '/tmp/adder')
 
 ae.encode.save(r'C:\Users\Ling\OneDrive\Documents\Brown-DESKTOP-8B9G99R\Timeseries-database\\timeseries-similarity\QZ\GunPoint\encoder')
 ae.decode.save(r'C:\Users\Ling\OneDrive\Documents\Brown-DESKTOP-8B9G99R\Timeseries-database\\timeseries-similarity\QZ\GunPoint\decoder')
